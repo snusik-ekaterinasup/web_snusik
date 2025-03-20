@@ -1,5 +1,4 @@
-Ненашев ПрИ-22
-
+Адамова Е.С ПРИ-22
 backend:
 
 Для запуска проекта нужно удостовериться, что установлены node.js и npm с https://nodejs.org/
@@ -17,9 +16,9 @@ npm install swagger-jsdoc swagger-ui-express
 
 Настройка переменных окружения в .env файле
 Создать .env в корне backend и объявить следующее:
+API_KEY=SECRET12
 DB_NAME=
 DB_USER=
 DB_PASSWORD=
 DB_HOST=
 DB_PORT=
-MAX_EVENTS_PER_DAY=
