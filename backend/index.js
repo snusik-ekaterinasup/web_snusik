@@ -34,7 +34,7 @@ Event.belongsTo(User, { foreignKey: "createdBy" }); // Одно мероприя
 
 // Синхронизация моделей с базой данных
 sequelize
-  .sync({ force: true }) // force: false - не пересоздавать таблицы, если они уже существуют
+  .sync({ force: false }) // force: false - не пересоздавать таблицы, если они уже существуют
   .then(() => {
     console.log("База данных синхронизирована.");
   })

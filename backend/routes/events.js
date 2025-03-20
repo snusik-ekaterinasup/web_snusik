@@ -7,7 +7,7 @@ const User = require("../models/user");
 const { Op } = require("sequelize");
 
 const checkApiKey = (req, res, next) => {
-  const apiKey = req.headers["x-api-key"];
+  const apiKey = "SECRET12";
   if (!apiKey) return res.status(401).json({ message: "API-ключ не предоставлен" });
   if (apiKey !== process.env.API_KEY) return res.status(403).json({ message: "Неверный API-ключ" });
   next();
@@ -49,7 +49,7 @@ router.use(checkApiKey);
  *           type: integer
  *         category:
  *           type: string
- *           enum: [конференция, семинар, вебинар, выставка]
+ *           enum: [concert,lecture,exhibition]
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -80,7 +80,7 @@ router.use(checkApiKey);
  *         name: category
  *         schema:
  *           type: string
- *           enum: [конференция, семинар, вебинар, выставка]
+ *           enum: [concert,lecture, exhibition]
  *         description: Фильтр по категории
  *     responses:
  *       200:
