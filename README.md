@@ -1,4 +1,4 @@
-Ненашев ПрИ-22
+АДАМОВА Е.С ПРИ-22
 
 backend:
 
@@ -22,4 +22,4 @@ DB_USER=
 DB_PASSWORD=
 DB_HOST=
 DB_PORT=
-MAX_EVENTS_PER_DAY=
+API_KEY=
