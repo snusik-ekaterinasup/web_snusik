@@ -262,55 +262,55 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// /**
-//  * @swagger
-//  * /auth/refresh:
-//  *   post:
-//  *     tags: [Auth]
-//  *     summary: Обновление access token
-//  *     description: Получение нового access token по refresh token
-//  *     requestBody:
-//  *       required: true
-//  *       content:
-//  *         application/json:
-//  *           schema:
-//  *             type: object
-//  *             required:
-//  *               - refreshToken
-//  *             properties:
-//  *               refreshToken:
-//  *                 type: string
-//  *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-//  *     responses:
-//  *       200:
-//  *         description: Новый access token
-//  *         content:
-//  *           application/json:
-//  *             schema:
-//  *               $ref: '#/components/schemas/RefreshResponse'
-//  *       401:
-//  *         description: Недействительный или просроченный refresh token
-//  *       500:
-//  *         description: Ошибка сервера
-//  */
-// router.post('/refresh', verifyRefreshToken, async (req, res) => {
-//   try {
-//     const user = await User.findByPk(req.user.id);
-//     if (!user) {
-//       return res.status(401).json({ message: 'Пользователь не найден' });
-//     }
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Обновление access token
+ *     description: Получение нового access token по refresh token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: Новый access token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RefreshResponse'
+ *       401:
+ *         description: Недействительный или просроченный refresh token
+ *       500:
+ *         description: Ошибка сервера
+ */
+router.post('/refresh', verifyRefreshToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Пользователь не найден' });
+    }
 
-//     const newAccessToken = jwt.sign(
-//       { id: user.id, role: user.role },
-//       process.env.JWT_SECRET,
-//       { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN }
-//     );
+    const newAccessToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN }
+    );
 
-//     res.json({ accessToken: `Bearer ${newAccessToken}` });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Ошибка сервера' });
-//   }
-// });
+    res.json({ accessToken: `Bearer ${newAccessToken}` });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
 
 
 
