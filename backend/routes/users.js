@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/user");
+const passport = require('passport');
 
 /**
  * @swagger
@@ -53,7 +54,7 @@ const User = require("../models/user");
  *                   type: string
  *                   example: "Ошибка сервера"
  */
-router.post("/", async (req, res) => {
+router.post("/", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const { name, email } = req.body;
 

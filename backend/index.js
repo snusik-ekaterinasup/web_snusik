@@ -1,60 +1,62 @@
-const express = require("express"); // Для работы с сервером
-const dotenv = require("dotenv"); // Для загрузки конфигурации из .env файла
-const cors = require("cors"); // Для разрешения запросов с других доменов
-const sequelize = require("./config/db"); // Импортируем sequelize
-const eventRoutes = require("./routes/events"); // Импортируем маршруты для мероприятий
-const userRoutes = require("./routes/users"); // Импортируем маршруты для пользователей
-const swaggerDocs = require("./config/swagger"); // Импортируем функцию для подключения Swagger
-const Event = require("./models/event");
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const sequelize = require("./config/db");
+const passport = require('passport');
+
+// Импортируем модели
 const User = require("./models/user");
-const morgan = require("morgan"); // Подключаем morgan
+const Event = require("./models/event");
+const RefreshToken = require("./models/refreshToken");
 
-dotenv.config(); // Загружаем переменные окружения из .env
+// Импортируем роутеры
+const eventRoutes = require("./routes/events");
+const userRoutes = require("./routes/users");
+const authRoutes = require("./routes/auth");
 
-const app = express(); // Создаем объект приложения Express
+// Swagger
+const swaggerDocs = require("./config/swagger");
 
-// Подключаем morgan для логирования запросов
-app.use(morgan("dev")); // 'dev' - предустановленный формат логирования
+// Инициализация Passport
+require("./config/passport");
 
-app.use(express.json()); // Для обработки входящих JSON-запросов
-app.use(cors()); // Для разрешения кросс-доменных запросов
+dotenv.config();
 
-const port = 3000; //process.env.PORT ||
+const app = express();
 
-// Подключаем Swagger
-swaggerDocs(app); // Вызываем функцию для подключения Swagger
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(passport.initialize());
 
-// Подключаем маршруты для мероприятий
+// Подключение роутеров
 app.use("/events", eventRoutes);
-app.use("/users", userRoutes); // Подключаем маршруты для пользователей
+app.use("/users", userRoutes);
+app.use("/auth", authRoutes);
 
-// Определяем связь между моделями
-User.hasMany(Event, { foreignKey: "createdBy" }); // У одного пользователя может быть много мероприятий
-Event.belongsTo(User, { foreignKey: "createdBy" }); // Одно мероприятие принадлежит одному пользователю
+// Настройка ассоциаций
+User.hasMany(Event, { foreignKey: "createdBy" });
+Event.belongsTo(User, { foreignKey: "createdBy" });
 
-// Синхронизация моделей с базой данных
-sequelize
-  .sync({ force: false }) // force: false - не пересоздавать таблицы, если они уже существуют
+User.hasMany(RefreshToken, { foreignKey: "userId" });
+RefreshToken.belongsTo(User, { foreignKey: "userId" });
+
+// Подключение Swagger
+swaggerDocs(app);
+
+// Проверка подключения и синхронизация БД
+sequelize.authenticate()
   .then(() => {
-    console.log("База данных синхронизирована.");
+    console.log("Подключение к БД установлено");
+    return sequelize.sync({ force: false });
   })
-  .catch((err) => {
-    console.error("Ошибка при синхронизации базы данных:", err);
-  });
-
-sequelize
-  .authenticate()
   .then(() => {
-    console.log("Подключение к базе данных установлено.");
+    console.log("Модели синхронизированы");
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Сервер запущен на порту ${PORT}`);
+    });
   })
-  .catch((err) => {
-    console.error("Ошибка при подключении к базе данных:", err);
-  });
-
-app.listen(port, (err) => {
-  if (err) {
+  .catch(err => {
     console.error("Ошибка при запуске сервера:", err);
-  } else {
-    console.log(`Сервер запущен на порту ${port}`);
-  }
-});
+  });

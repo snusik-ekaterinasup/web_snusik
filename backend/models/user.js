@@ -24,6 +24,7 @@
  *           description: Дата создания пользователя
  */
 
+const bcrypt = require('bcryptjs');
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/db");
 
@@ -37,17 +38,37 @@ const User = sequelize.define(
     },
     name: {
       type: DataTypes.STRING,
-      allowNull: false, // Имя пользователя обязательно
+      allowNull: false,
     },
     email: {
       type: DataTypes.STRING,
-      allowNull: false, // Email пользователя обязателен
-      unique: true, // Email должен быть уникальным
+      allowNull: false,
+      unique: true,
+      validate: {
+        isEmail: true,
+      }
     },
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      set(value) {
+        // Хеширование пароля перед сохранением
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(value, salt);
+        this.setDataValue('password', hash);
+      }
+    },
+    
   },
   {
-    tableName: "users", // Явное указание имени таблицы
+    tableName: "users",
+    timestamps: true,
   }
 );
+
+// Метод для сравнения паролей
+User.prototype.comparePassword = function(candidatePassword) {
+  return bcrypt.compareSync(candidatePassword, this.password);
+};
 
 module.exports = User;

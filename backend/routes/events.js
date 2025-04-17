@@ -1,3 +1,4 @@
+const passport = require('passport');
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const express = require("express");
@@ -197,7 +198,7 @@ router.get("/:id", async (req, res) => {
  *     security:
  *       - ApiKeyAuth: []
  */
-router.post("/", async (req, res) => {
+router.post("/", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const { createdBy } = req.body;
     const user = await User.findByPk(createdBy);
@@ -245,7 +246,7 @@ router.post("/", async (req, res) => {
  *     security:
  *       - ApiKeyAuth: []
  */
-router.put("/:id", async (req, res) => {
+router.put("/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const event = await Event.findByPk(req.params.id);
     if (!event) return res.status(404).json({ message: "Мероприятие не найдено" });
@@ -284,7 +285,7 @@ router.put("/:id", async (req, res) => {
  *     security:
  *       - ApiKeyAuth: []
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const event = await Event.findByPk(req.params.id);
     if (!event) return res.status(404).json({ message: "Мероприятие не найдено" });
