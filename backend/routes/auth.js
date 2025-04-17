@@ -268,7 +268,7 @@ router.post('/login', async (req, res) => {
  *   post:
  *     tags: [Auth]
  *     summary: Обновление access token
- *     description: Получение нового access token по refresh token
+ *     description: Получение новогоо access token по refresh token
  *     requestBody:
  *       required: true
  *       content:
