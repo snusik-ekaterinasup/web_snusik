@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    // ... ваши существующие опции (module: CommonJS, baseUrl, paths и т.д.) ...
+    "target": "ES2017",
+    "module": "CommonJS",
+    "baseUrl": "./",
+    "paths": {
+      "@models/*": ["models/*"],
+      "@routes/*": ["routes/*"],
+      "@config/*": ["config/*"]
+    },
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true
+    // ... другие ваши опции ...
+  },
+  // --- ДОБАВЬТЕ ЭТУ СЕКЦИЮ ---
+  "ts-node": {
+    // Эта опция может помочь ts-node правильно разрешать файлы .ts
+    "files": true,
+    // Вы можете раскомментировать следующую строку для ускорения запуска dev,
+    // но это отключит проверку типов во время выполнения ts-node
+    // "transpileOnly": true,
+    "compilerOptions": {
+      // Можно явно указать модуль здесь, но обычно он наследуется
+      "module": "CommonJS"
+    }
+    // НЕ НУЖНО добавлять "require": ["tsconfig-paths/register"] сюда,
+    // так как мы используем флаг -r в командной строке.
+  },
+  // --------------------------
+  "include": ["*.ts", "models/**/*.ts", "routes/**/*.ts", "config/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

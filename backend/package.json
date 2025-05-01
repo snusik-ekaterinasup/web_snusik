@@ -1,31 +1,79 @@
 {
-    "name": "web",
-    "version": "1.0.0",
-    "main": "index.js",
-    "scripts": {
-        "dev": "nodemon index.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
-    "description": "",
-    "dependencies": {
-        "bcryptjs": "^3.0.2",
-        "cors": "^2.8.5",
-        "dotenv": "^16.4.7",
-        "express": "^4.21.2",
-        "jsonwebtoken": "^9.0.2",
-        "morgan": "^1.10.0",
-        "passport": "^0.7.0",
-        "passport-jwt": "^4.0.1",
-        "pg": "^8.14.1",
-        "pg-hstore": "^2.3.4",
-        "sequelize": "^6.37.6",
-        "swagger-jsdoc": "^6.2.8",
-        "swagger-ui-express": "^5.0.1"
-    },
-    "devDependencies": {
-        "nodemon": "^3.1.9"
-    }
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register index.ts",
+    "build": "tsc && tsc-alias",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "tsc": "tsc",
+    "lint": "eslint . --ext .ts,.js,.mjs",
+    "lint:fix": "eslint . --ext .ts,.js,.mjs --fix",
+    "format": "prettier --write .",
+    "check": "eslint . --ext .ts,.js,.mjs && tsc --noEmit",
+    "prepare": "husky install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "js-yaml": "^4.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "lint": "^0.8.19",
+    "morgan": "^1.10.0",
+    "ms": "^2.1.3",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.12.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.35.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/js-yaml": "^4.0.9",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/morgan": "^1.9.9",
+    "@types/ms": "^0.7.34",
+    "@types/node": "^20.14.2",
+    "@types/passport": "^1.0.16",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/pg": "^8.11.6",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.6",
+    "@types/validator": "^13.12.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^15.15.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "nodemon": "^3.1.4",
+    "prettier": "^3.3.2",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsc-alias": "^1.8.15",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.5.2",
+    "typescript-eslint": "^8.31.1"
+  },
+  "lint-staged": {
+    "**/*.{ts,js,mjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
+  }
 }
