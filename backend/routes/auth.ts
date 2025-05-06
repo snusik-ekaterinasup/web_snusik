@@ -432,7 +432,7 @@ router.post(
         process.env.JWT_ACCESS_EXPIRES_SECONDS || '900';
 
       if (!jwtSecret) {
-        console.error('[REFRESH] CRITICAL ERROR: JWT_SECRET not set!'); // Оставляем
+        console.error('[REFRESH] CRITICAL ERROR: JWT_SECRET not set!');
         throw new Error('Ошибка конфигурации сервера JWT.');
       }
 

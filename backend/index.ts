@@ -8,7 +8,7 @@ import morgan from 'morgan';
 // --- Конфигурация ---
 import sequelize from '@config/db'; // Предполагаем export default sequelize
 import setupSwagger from '@config/swagger'; // Предполагаем export default function
-import './config/passport'; // Импортируем для выполнения passport.use() - side effects only
+import '@config/passport'; // Импортируем для выполнения passport.use() - side effects only
 
 // --- Маршруты ---
 import eventRoutes from '@routes/events'; // Предполагаем export default router
@@ -36,7 +36,7 @@ app.use(morgan('dev')); // Логирование HTTP запросов
 const allowedOrigins = [
   `http://localhost:${port}`, // Разрешаем доступ с того же хоста и порта (для Swagger UI)
   'http://127.0.0.1:3000', // Можно добавить и 127.0.0.1 на всякий случай
-  // 'http://localhost:5173', // Пример: добавьте URL вашего фронтенда (если он есть)
+  'http://localhost:5173', // Пример: добавьте URL вашего фронтенда (если он есть)
 ];
 
 const corsOptions: CorsOptions = {

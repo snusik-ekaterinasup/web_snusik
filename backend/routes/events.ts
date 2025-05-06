@@ -5,7 +5,7 @@ import passport from 'passport';
 // import { Op } from 'sequelize'; // Не используется
 
 // Импортируем модель и middleware (убедитесь, что путь верный)
-import { EventModel, apiKeyAuth } from '@models/event.js';
+import { EventModel, apiKeyAuth } from '@models/event';
 
 // --- Интерфейсы ---
 

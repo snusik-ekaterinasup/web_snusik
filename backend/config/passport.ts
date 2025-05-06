@@ -6,8 +6,8 @@ import {
   VerifiedCallback,
 } from 'passport-jwt';
 // Предполагаем, что модель User экспортируется как именованный экспорт
-import { User } from '@models/user.js'; // <-- Добавлено .js
-import { UserJwtPayload } from '@routes/auth.js'; 
+import { User } from '@models/user'; // <-- Добавлено .js
+import { UserJwtPayload } from '@routes/auth';
 
 // Загрузка переменных окружения (убедитесь, что dotenv загружен в index.ts или здесь)
 // import 'dotenv/config'; // Можно добавить, если этот файл может быть точкой входа, но лучше в index.ts
@@ -33,7 +33,7 @@ passport.use(
   new JwtStrategy(
     opts,
     // Async верификационная функция
-    async (jwtPayload: unknown, done: VerifiedCallback) => {
+    async () => {
       // Типизируем done, jwtPayload пока any
       // TODO: Определить интерфейс для jwtPayload для лучшей типизации
       // interface JwtPayload {
@@ -42,30 +42,35 @@ passport.use(
       //   iat?: number;
       //   exp?: number;
       // }
-     // Начало вызова passport.use
-passport.use(
-  // Создание нового экземпляра стратегии
-  new JwtStrategy(
-    // Первый аргумент: опции
-    opts,
-    // Второй аргумент: асинхронная функция верификации
-    async (jwtPayload: UserJwtPayload, done: VerifiedCallback) => {
-      try {
-        const user = await User.findByPk(jwtPayload.id);
-        if (user) {
-          return done(null, user); // Пользователь найден
-        } else {
-          return done(null, false); // Пользователь не найден
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('[Auth] Ошибка при поиске пользователя по JWT:', error);
-        return done(error, false); // Ошибка сервера
-      }
-    } // Конец функции верификации
-  ) // Конец конструктора new JwtStrategy
-); // Конец вызова passport.use
-    }))
+      // Начало вызова passport.use
+      passport.use(
+        // Создание нового экземпляра стратегии
+        new JwtStrategy(
+          // Первый аргумент: опции
+          opts,
+          // Второй аргумент: асинхронная функция верификации
+          async (jwtPayload: UserJwtPayload, done: VerifiedCallback) => {
+            try {
+              const user = await User.findByPk(jwtPayload.id);
+              if (user) {
+                return done(null, user); // Пользователь найден
+              } else {
+                return done(null, false); // Пользователь не найден
+              }
+            } catch (error) {
+              // eslint-disable-next-line no-console
+              console.error(
+                '[Auth] Ошибка при поиске пользователя по JWT:',
+                error,
+              );
+              return done(error, false); // Ошибка сервера
+            }
+          }, // Конец функции верификации
+        ), // Конец конструктора new JwtStrategy
+      ); // Конец вызова passport.use
+    },
+  ),
+);
 // Экспортируем сконфигурированный экземпляр passport
 // Примечание: Обычно этот файл импортируют только для его side effects (выполнения passport.use),
 // а сам объект passport импортируют напрямую из 'passport' в других файлах, где он нужен.

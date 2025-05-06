@@ -6,7 +6,7 @@ import passport from 'passport';
 import { ValidationError } from 'sequelize'; // Импортируем тип ошибки валидации Sequelize
 
 // Import models using ES module syntax and .js extension
-import { User } from '@models/user.js';
+import { User } from '@models/user';
 
 // Определяем интерфейс для ожидаемого тела запроса при создании пользователя
 interface UserCreationBody {

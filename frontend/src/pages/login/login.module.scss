@@ -1,0 +1,134 @@
+.loginPageContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f4f6f8; // Светлый фон
+  padding: 20px;
+  box-sizing: border-box;
+  font-family: "Arial", sans-serif;
+}
+
+.loginFormWrapper {
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px; // Ограничиваем максимальную ширину формы
+  text-align: center;
+
+  h2 {
+    margin-bottom: 25px;
+    color: #333;
+    font-size: 1.8rem;
+  }
+}
+
+.loginForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; // Расстояние между группами формы
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+
+  label {
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #555;
+    font-size: 0.9rem;
+  }
+
+  input {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #3498db; // Цвет рамки при фокусе
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }
+  }
+}
+
+.submitButton {
+  background-color: #3498db; // Основной цвет кнопки
+  color: white;
+  padding: 12px 15px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #2980b9; // Темнее при наведении
+  }
+
+  &:disabled {
+    // Если кнопка будет отключена
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+}
+
+.alternativeAction {
+  margin-top: 25px;
+  font-size: 0.9rem;
+  color: #555;
+
+  .link {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: bold;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.errorMessage {
+  background-color: #f8d7da; // Светло-красный фон для ошибок
+  color: #721c24; // Темно-красный текст
+  padding: 10px 15px;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+// Минимальный адаптив
+@media (max-width: 480px) {
+  .loginFormWrapper {
+    padding: 20px;
+    h2 {
+      font-size: 1.6rem;
+    }
+  }
+  .formGroup input {
+    padding: 10px;
+  }
+  .submitButton {
+    padding: 10px;
+  }
+}
+.successMessage {
+    background-color: #d4edda; // Светло-зеленый
+    color: #155724;
+    padding: 10px 15px;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    text-align: left;
+  }

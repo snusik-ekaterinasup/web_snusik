@@ -1,9 +1,8 @@
-import js from '@eslint/js';
-import globals from 'globals';
-import tseslint from 'typescript-eslint';
-import pluginPrettier from 'eslint-plugin-prettier';
+import js from '@eslint/js'; // Базовые правила ESLint
+import globals from 'globals'; // Предопределенные глобальные переменные
+import tseslint from 'typescript-eslint'; // Инструменты для линтинга TypeScript
+import pluginPrettier from 'eslint-plugin-prettier'; // Интеграция Prettier в ESLint
 import eslintConfigPrettier from 'eslint-config-prettier';
-// import pluginReact from "eslint-plugin-react";
 import { defineConfig } from 'eslint/config'; // <-- Убедитесь, что этот импорт есть
 
 export default defineConfig([
