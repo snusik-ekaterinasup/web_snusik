@@ -1,0 +1,60 @@
+// // src/pages/eventFormPage/eventFormPage.module.scss
+
+// .eventFormPageContainer {
+//     display: flex;
+//     justify-content: center;
+//     padding: 2rem;
+//     background-color: #f4f6f8;
+//     min-height: calc(100vh - 120px); // Примерная высота за вычетом шапки и подвала
+//     box-sizing: border-box;
+//   }
+
+//   .formWrapper {
+//     background-color: #fff;
+//     padding: 2rem 2.5rem;
+//     border-radius: 8px;
+//     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+//     width: 100%;
+//     max-width: 700px;
+
+//     h2 {
+//       text-align: center;
+//       margin-top: 0;
+//       margin-bottom: 1.5rem;
+//       color: #333;
+//       font-size: 1.8rem;
+//     }
+//   }
+
+//   .loading,
+//   .error { // Общие стили для сообщений
+//     text-align: center;
+//     font-size: 1.2rem;
+//     padding: 2rem;
+//     color: #555;
+//     border-radius: 4px;
+//   }
+
+//   .errorMessage {
+//     background-color: #f8d7da;
+//     color: #721c24;
+//     padding: 0.75rem 1.25rem;
+//     margin-bottom: 1rem;
+//     border: 1px solid #f5c6cb;
+//     border-radius: 0.25rem;
+//     text-align: left;
+//     font-size: 0.9rem;
+//   }
+
+//   // Адаптивность для обертки формы
+//   @media (max-width: 768px) {
+//     .eventFormPageContainer {
+//       padding: 1rem;
+//     }
+//     .formWrapper {
+//       padding: 1.5rem;
+//       h2 {
+//         font-size: 1.6rem;
+//       }
+//     }
+//   }

@@ -222,48 +222,288 @@
   }
 }
 .filtersContainer {
-    background-color: #ffffff;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  
-    h3 {
-      margin-top: 0;
-      margin-bottom: 1rem;
-      font-size: 1.3rem;
-      color: #333;
-    }
-  }
-  
-  .filterButtons {
-    display: flex;
-    flex-wrap: wrap; // Перенос кнопок на новую строку, если не влезают
-    gap: 0.75rem; // Промежуток между кнопками
-  }
-  
-  .filterButton {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
-    border: 1px solid #ddd;
-    background-color: #f9f9f9;
+  background-color: #ffffff;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
     color: #333;
-    border-radius: 20px; // Скругленные кнопки
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-  
+  }
+}
+
+.filterButtons {
+  display: flex;
+  flex-wrap: wrap; // Перенос кнопок на новую строку, если не влезают
+  gap: 0.75rem; // Промежуток между кнопками
+}
+
+.filterButton {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  border: 1px solid #ddd;
+  background-color: #f9f9f9;
+  color: #333;
+  border-radius: 20px; // Скругленные кнопки
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    background-color: #e9e9e9;
+    border-color: #ccc;
+  }
+
+  &.activeFilter {
+    // Стиль для активной кнопки фильтра
+    background-color: #007bff; // Пример цвета для активного фильтра (можно взять с картинки желтый)
+    // background-color: #f0ad4e; // Желтый как на картинке
+    color: #ffffff;
+    border-color: #007bff;
+    // border-color: #eea236;
+    font-weight: bold;
+  }
+}
+.pageHeader {
+  display: flex;
+  justify-content: space-between; // Разместить элементы по краям
+  align-items: center; // Выровнять по центру по вертикали
+  margin-bottom: 1.5rem; // Отступ снизу
+  flex-wrap: wrap; // Разрешить перенос на маленьких экранах
+  gap: 1rem; // Промежуток, если перенесутся
+}
+
+.pageHeader h1 {
+  margin: 0; // Убираем стандартный отступ у H1
+}
+
+.createEventButton {
+  display: inline-block; // Для применения padding
+  padding: 0.7rem 1.3rem;
+  background-color: #28a745; // Зеленый цвет для действия "Создать"
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 5px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #218838; // Темнее при наведении
+  }
+}
+
+// Стили для карточки
+.eventCard {
+  // ... (существующие стили .eventCard) ...
+  display: flex; // Используем flex для разделения контента и действий
+  flex-direction: column; // Располагаем вертикально
+
+  .eventCardContent {
+    // ... (существующие стили .eventCardContent) ...
+    flex-grow: 1; // Позволяем контенту расти и занимать место
+  }
+
+  .cardActions {
+    padding: 0.75rem 1.5rem; // Отступы для области кнопок
+    margin-top: auto; // Прижимает блок к низу карточки, если высота разная
+    border-top: 1px solid #eee; // Линия-разделитель
+    text-align: right; // Выравниваем кнопки справа
+    display: flex; // Можно использовать flex для управления кнопками
+    justify-content: flex-end; // Выравниваем по правому краю
+    gap: 0.5rem; // Промежуток между кнопками (если их будет несколько)
+  }
+
+  .editButton {
+    // Стили похожи на createEventButton, но можно сделать компактнее или другого цвета
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    background-color: #ffc107; // Желтый для редактирования
+    color: #212529; // Темный текст
+    text-decoration: none;
+    border-radius: 4px;
+    border: none;
+    transition: background-color 0.2s ease;
+
     &:hover {
-      background-color: #e9e9e9;
-      border-color: #ccc;
-    }
-  
-    &.activeFilter { // Стиль для активной кнопки фильтра
-      background-color: #007bff; // Пример цвета для активного фильтра (можно взять с картинки желтый)
-      // background-color: #f0ad4e; // Желтый как на картинке
-      color: #ffffff;
-      border-color: #007bff;
-      // border-color: #eea236;
-      font-weight: bold;
+      background-color: #e0a800;
     }
   }
-  
+
+  // Можно добавить стили для кнопки удаления .deleteButton
+}
+
+// Адаптация для pageHeader
+@media (max-width: 768px) {
+  .pageHeader {
+    justify-content: center; // На средних экранах можно по центру
+  }
+}
+
+@media (max-width: 480px) {
+  .pageHeader {
+    flex-direction: column; // В столбик на мобильных
+    align-items: stretch; // Растянуть элементы на всю ширину
+    text-align: center;
+  }
+  .createEventButton {
+    width: 100%; // Кнопка на всю ширину
+    box-sizing: border-box;
+  }
+}
+// src/pages/events/events.module.scss
+// ... (существующие стили) ...
+
+.eventCard {
+  // ...
+  transition: opacity 0.3s ease-out; // Плавное исчезновение при удалении
+
+  &.deleting {
+    opacity: 0.5; // Делаем полупрозрачной во время удаления
+    pointer-events: none; // Блокируем взаимодействие
+  }
+}
+
+.cardActions {
+  padding: 0.75rem 1.5rem;
+  margin-top: auto;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end; // Кнопки справа
+  gap: 0.5rem; // Промежуток
+}
+
+.editButton {
+  // ... (существующие стили) ...
+  &.disabledLink {
+    // Стиль для заблокированной ссылки Редактировать
+    opacity: 0.6;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+}
+
+.deleteButton {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background-color: #dc3545; // Красный цвет для удаления
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #c82333; // Темнее при наведении
+  }
+
+  &:disabled {
+    background-color: #bdc3c7;
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+// ... (остальные стили) ...
+// src/pages/events/events.module.scss
+// ... (остальные стили) ...
+
+.eventCard {
+  // ... (существующие стили) ...
+  display: flex; // Добавим flex для позиционирования кнопок
+  flex-direction: column; // Элементы карточки в столбик
+}
+
+.eventCardContent {
+ // ... (существующие стили) ...
+ flex-grow: 1; // Позволяет контенту занять место, отталкивая кнопки вниз
+}
+
+.eventCardActions {
+  padding: 0.75rem 1.5rem; // Отступы для блока кнопок
+  border-top: 1px solid #eee; // Разделитель
+  display: flex;
+  flex-wrap: wrap; // Перенос кнопок, если не помещаются
+  gap: 0.5rem; // Промежуток между кнопками
+  justify-content: flex-start; // Выравнивание кнопок
+}
+
+.actionButton {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none; // Для Link
+  display: inline-flex; // Для выравнивания текста и иконок (если будут)
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// Стили для конкретных кнопок
+.participantsButton {
+  background-color: #6c757d;
+  color: white;
+  border-color: #6c757d;
+  &:hover:not(:disabled) {
+    background-color: #5a6268;
+    border-color: #545b62;
+  }
+}
+
+.participateButton {
+  background-color: #28a745;
+  color: white;
+  border-color: #28a745;
+  &:hover:not(:disabled) {
+    background-color: #218838;
+    border-color: #1e7e34;
+  }
+}
+
+.cancelButton { // Для кнопки "Отменить участие"
+  background-color: #ffc107;
+  color: #212529;
+  border-color: #ffc107;
+   &:hover:not(:disabled) {
+    background-color: #e0a800;
+    border-color: #d39e00;
+  }
+}
+
+.editButton {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+   &:hover:not(:disabled) {
+    background-color: #0069d9;
+    border-color: #0062cc;
+  }
+}
+
+.deleteButton {
+  background-color: #dc3545;
+  color: white;
+  border-color: #dc3545;
+  &:hover:not(:disabled) {
+    background-color: #c82333;
+    border-color: #bd2130;
+  }
+}

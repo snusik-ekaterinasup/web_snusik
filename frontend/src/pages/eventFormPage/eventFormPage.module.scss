@@ -1,0 +1,191 @@
+/* src/pages/eventFormPage/eventFormPage.module.scss */
+
+.formContainer {
+  max-width: 650px; // Немного шире для удобства
+  margin: 2rem auto; // Центрирование и отступы сверху/снизу
+  padding: 2rem 2.5rem; // Внутренние отступы
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.formContainer h2 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 2rem; // Больше отступ после заголовка
+  color: #333;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem; // Отступ между группами полей
+
+  label {
+    display: block;
+    margin-bottom: 0.6rem; // Отступ под меткой
+    font-weight: 600; // Полужирный шрифт метки
+    color: #495057; // Цвет метки
+    font-size: 0.95rem;
+  }
+
+  input[type="text"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    width: 100%;
+    padding: 0.8rem 1rem; // Увеличенные отступы в полях
+    border: 1px solid #ced4da; // Цвет рамки
+    border-radius: 4px;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057; // Цвет текста в поле
+    background-color: #fff;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+    &:focus {
+      outline: none;
+      border-color: #80bdff; // Цвет рамки при фокусе
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); // Тень при фокусе
+    }
+
+    &:disabled {
+      background-color: #e9ecef; // Фон для заблокированных полей
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+  }
+
+  textarea {
+    resize: vertical; // Разрешить изменять высоту
+    min-height: 120px; // Минимальная высота
+  }
+
+  // Дополнительный стиль для подсказки под полем даты
+  small {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+}
+
+.formActions {
+  margin-top: 2.5rem; // Больший отступ перед кнопками
+  padding-top: 1.5rem; // Отступ сверху внутри блока
+  border-top: 1px solid #e9ecef; // Разделительная линия
+  display: flex;
+  justify-content: flex-end; // Кнопки справа
+  align-items: center;
+  gap: 1rem; // Расстояние между кнопками
+}
+
+// Общие стили для кнопок в .formActions, если они будут похожи
+%actionButtonBase {
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+    text-decoration: none; // Для Link
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.5;
+
+    &:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+}
+
+// Кнопка отправки (Сохранить/Создать)
+.formActions button[type="submit"] {
+  @extend %actionButtonBase; // Наследуем базовые стили
+  background-color: #28a745; // Зеленый
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: #218838; // Темнее зеленый
+  }
+}
+
+// Кнопка/Ссылка "Отмена"
+.cancelButton {
+  @extend %actionButtonBase; // Наследуем базовые стили
+  background-color: #f8f9fa; // Светлый фон
+  color: #6c757d;        // Серый текст
+  border: 1px solid #ced4da; // Серая рамка
+
+  &:hover {
+    background-color: #e2e6ea;
+    border-color: #dae0e5;
+    color: #5a6268;
+  }
+}
+
+
+// Стили для отображения ошибок и загрузки
+.loading, .error {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+
+.loading {
+  color: #004085; // Темно-синий текст
+  background-color: #cce5ff; // Светло-голубой фон
+  border-color: #b8daff; // Голубая рамка
+}
+
+.error {
+  color: #721c24; // Темно-красный текст
+  background-color: #f8d7da; // Светло-розовый фон
+  border-color: #f5c6cb; // Розовая рамка
+}
+
+// Контейнер для ошибок загрузки (добавляет отступы и ссылку)
+.errorContainer {
+    text-align: center;
+    margin-top: 2rem;
+    .error { // Используем уже определенный стиль .error
+        margin-bottom: 1rem;
+    }
+    a { // Стиль для ссылки "Вернуться к списку"
+        color: #007bff;
+        text-decoration: underline;
+        &:hover {
+            color: #0056b3;
+        }
+    }
+}
+
+
+// Минимальный адаптив
+@media (max-width: 768px) {
+  .formContainer {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  .formContainer h2 {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+    .formActions {
+        flex-direction: column-reverse; // Кнопки друг под другом, Отмена сверху
+        align-items: stretch; // Растянуть кнопки на всю ширину
+
+        button[type="submit"], .cancelButton {
+            width: 100%; // Занять всю ширину
+        }
+    }
+}

@@ -1,67 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import styles from './home.module.scss';
-import { getUser } from '../../utils/storage';
-import { authService } from '../../api/authService';
+// src/pages/home/home.tsx
+
+import React, { useEffect } from "react"; // Убрали useState, если он больше не нужен для currentUser
+import { Link, useNavigate } from "react-router-dom";
+import styles from "./home.module.scss";
+// import { getUser } from '../../utils/storage'; // Больше не нужен прямой вызов
+// import { authService } from '../../api/authService'; // logout теперь через Redux
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import {
+  logout,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from "../../features/auth/authSlice";
 
 const HomePage: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<{ name: string } | null>(null);
-  const navigate = useNavigate();
+  // const [currentUser, setCurrentUser] = useState<{ name: string } | null>(null); // Заменяем на Redux
+  const navigate = useNavigate(); // Оставляем, если нужен для других целей
+  const dispatch = useAppDispatch();
 
-  // Функция для проверки состояния авторизации и обновления UI
-  const checkAuthState = () => {
-    const user = getUser();
-    if (user) {
-      setCurrentUser({ name: user.name });
-    } else {
-      setCurrentUser(null);
-    }
-  };
+  const currentUser = useAppSelector(selectCurrentUser); // Получаем пользователя из Redux
+  const isAuthenticated = useAppSelector(selectIsAuthenticated); // Для общей проверки
 
+  // useEffect для каких-либо действий при монтировании или изменении isAuthenticated, если нужно.
+  // Например, если бы мы хотели загружать какие-то данные для главной страницы,
+  // зависящие от статуса авторизации.
+  // В данном случае, authSlice уже инициализируется из localStorage,
+  // так что selectCurrentUser должен вернуть актуальные данные.
   useEffect(() => {
-    checkAuthState(); // Проверяем при монтировании
-
-    // Подписываемся на событие storage, чтобы реагировать на изменения
-    // в других вкладках (если токен меняется там)
-    // А также чтобы обновить состояние, если логин/логаут произошел на другой странице
-    // и мы вернулись на главную.
-    const handleStorageChange = () => {
-      checkAuthState();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    // Дополнительно, можно использовать кастомное событие после логина/логаута,
-    // чтобы обновлять состояние в активной вкладке без перезагрузки страницы.
-    // Это требует более сложной архитектуры (например, Context API).
-    // Для простоты, сейчас HomePage будет обновляться при навигации или изменении в localStorage.
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  // Этот useEffect будет срабатывать каждый раз, когда пользователь переходит на эту страницу,
-  // обеспечивая актуальность отображения имени пользователя.
-  useEffect(() => {
-    checkAuthState();
-  }, [navigate]); // Зависимость от navigate (или location.pathname, если используется)
+    // Если нужно выполнить какие-то действия при изменении currentUser или isAuthenticated
+    // console.log('HomePage: Auth state changed:', isAuthenticated, currentUser);
+  }, [isAuthenticated, currentUser]);
 
   const handleLogout = () => {
-    authService.logout();
-    setCurrentUser(null);
-    // Можно добавить navigate('/login'); если хотите принудительно перенаправить
-    // но кнопки Авторизация/Регистрация и так появятся.
+    dispatch(logout());
+    // После диспатча logout, currentUser и isAuthenticated в Redux обновятся,
+    // и компонент автоматически перерисуется с новым состоянием.
+    // navigate('/login'); // Можно не делать, т.к. кнопки и так изменятся
   };
 
   return (
     <div className={styles.homePageContainer}>
       <header className={styles.header}>
-        <div className={styles.logo}>
-          {/* Замените на ваш реальный логотип */}
-          MyApp
-        </div>
+        <div className={styles.logo}>MyAppLogo</div>
         <nav className={styles.navigation}>
-          {currentUser ? (
+          {currentUser ? ( // Проверяем currentUser из Redux
             <div className={styles.userInfo}>
               <span>Здравствуйте, {currentUser.name}!</span>
               <button onClick={handleLogout} className={styles.navButton}>
@@ -85,9 +68,9 @@ const HomePage: React.FC = () => {
         <section className={styles.heroSection}>
           <h1>Добро пожаловать в Приложение Мероприятий!</h1>
           <p className={styles.appDescription}>
-            Наше приложение поможет вам находить самые интересные мероприятия в вашем городе,
-            управлять своим участием и не пропускать ничего важного.
-            Присоединяйтесь к нам!
+            Наше приложение поможет вам находить самые интересные мероприятия в
+            вашем городе, управлять своим участием и не пропускать ничего
+            важного. Присоединяйтесь к нам!
           </p>
           <Link to="/events" className={styles.ctaButton}>
             Смотреть мероприятия
@@ -96,7 +79,10 @@ const HomePage: React.FC = () => {
       </main>
 
       <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} Приложение Мероприятий. Все права защищены.</p>
+        <p>
+          © {new Date().getFullYear()} Приложение Мероприятий. Все права
+          защищены.
+        </p>
       </footer>
     </div>
   );

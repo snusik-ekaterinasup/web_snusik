@@ -33,8 +33,10 @@
       padding: 0.5rem 1rem;
       border: 1px solid #93daec;
       border-radius: 4px;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    
+      transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
+
       &:hover {
         background-color: #ecf0f1; // Фон при наведении становится светлым (как изначальный цвет текста)
         color: #2c3e50; // Цвет текста при наведении должен становиться темным

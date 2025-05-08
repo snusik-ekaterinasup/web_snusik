@@ -1,9 +1,11 @@
-// --- START OF FILE routes/auth.ts (Финальная версия v3) ---
+// backend/routes/auth.ts
 
 import express, { Router, Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
-
-// Импортируем модели и типы с алиасами
+import passport from 'passport';
+import { EventModel } from '@models/event';
+// Импортируем модели и типы
+// Адаптируйте пути, если @models/ не настроен как алиас на ./models/
 import { User, UserAttributes } from '@models/user';
 import { RefreshToken } from '@models/refreshToken';
 
@@ -32,6 +34,7 @@ const verifyRefreshToken = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  // ... (ваш существующий код для verifyRefreshToken)
   try {
     const { refreshToken }: { refreshToken?: string } = req.body;
     if (!refreshToken) {
@@ -40,7 +43,6 @@ const verifyRefreshToken = async (
     }
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      // Оставляем эту критическую ошибку
       console.error('[VERIFY_REFRESH] CRITICAL ERROR: JWT_SECRET not set!');
       res.status(500).json({ message: 'Ошибка конфигурации сервера' });
       return;
@@ -50,64 +52,33 @@ const verifyRefreshToken = async (
     try {
       const decoded = jwt.verify(refreshToken, jwtSecret);
       if (typeof decoded === 'string' || typeof decoded?.id !== 'number') {
-        throw new jwt.JsonWebTokenError(
-          'Неверный payload токена: отсутствует или неверный id',
-        );
+        throw new jwt.JsonWebTokenError('Неверный payload токена: отсутствует или неверный id');
       }
       payload = decoded as UserJwtPayload;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
-        try {
-          // Просто пытаемся удалить, игнорируем ошибку удаления
-          await RefreshToken.destroy({ where: { token: refreshToken } });
-        } catch {
-          // Ошибку удаления токена можно игнорировать
-        }
-        res.status(401).json({ message: 'Refresh token истек' });
-        return;
+        try { await RefreshToken.destroy({ where: { token: refreshToken } }); } catch { /* Игнор */ }
+        res.status(401).json({ message: 'Refresh token истек' }); return;
       }
       if (error instanceof jwt.JsonWebTokenError) {
-        res.status(401).json({
-          message: `Недействительный refresh token: ${error.message}`,
-        });
-        return;
+        res.status(401).json({ message: `Недействительный refresh token: ${error.message}` }); return;
       }
-      res.status(500).json({ message: 'Ошибка проверки токена' });
-      return;
+      res.status(500).json({ message: 'Ошибка проверки токена' }); return;
     }
-
-    const tokenInDb = await RefreshToken.findOne({
-      where: { token: refreshToken, userId: payload.id },
-    });
-
+    const tokenInDb = await RefreshToken.findOne({ where: { token: refreshToken, userId: payload.id } });
     if (!tokenInDb) {
-      res.status(401).json({
-        message: 'Refresh token не найден или не принадлежит пользователю',
-      });
-      return;
+      res.status(401).json({ message: 'Refresh token не найден или не принадлежит пользователю' }); return;
     }
-
     if (new Date() > tokenInDb.expiresAt) {
-      try {
-        // Просто пытаемся удалить, игнорируем ошибку удаления
-        await tokenInDb.destroy();
-      } catch {
-        // Ошибку удаления токена можно игнорировать
-      }
-      res.status(401).json({ message: 'Refresh token истек (согласно БД)' });
-      return;
+      try { await tokenInDb.destroy(); } catch { /* Игнор */ }
+      res.status(401).json({ message: 'Refresh token истек (согласно БД)' }); return;
     }
-
     req.user = payload;
     next();
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
+    const message = error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
     if (!res.headersSent) {
-      res.status(500).json({
-        message: 'Внутренняя ошибка сервера при проверке токена',
-        details: message,
-      });
+      res.status(500).json({ message: 'Внутренняя ошибка сервера при проверке токена', details: message });
     }
   }
 };
@@ -121,38 +92,46 @@ const verifyRefreshToken = async (
  * components:
  *   schemas:
  *     RegisterInput:
- *       $ref: '#/components/schemas/UserInput'
+ *       $ref: '#/components/schemas/UserInput' # Убедитесь, что UserInput определен в models/user.ts
  *     LoginInput:
- *         type: object
- *         required: [email, password]
- *         properties:
- *             email: { type: string, format: email, example: "ivan.ivanov@example.com" }
- *             password: { type: string, format: password, example: "securePassword123" }
+ *       type: object
+ *       required: [email, password]
+ *       properties:
+ *         email: { type: string, format: email, example: "ivan.ivanov@example.com" }
+ *         password: { type: string, format: password, example: "securePassword123" }
  *     AuthResponse:
  *       type: object
  *       properties:
  *         accessToken: { type: string, description: 'JWT токен для доступа (включая "Bearer ")', example: 'Bearer eyJhbGciOi...' }
  *         refreshToken: { type: string, description: 'Токен для обновления access token', example: 'eyJhbGciOi...' }
- *         user: { $ref: '#/components/schemas/User' }
+ *         user: { $ref: '#/components/schemas/User' } # Убедитесь, что User определен в models/user.ts
  *     RefreshResponse:
  *       type: object
  *       properties:
  *         accessToken: { type: string, description: 'Новый JWT токен для доступа (включая "Bearer ")', example: 'Bearer eyJhbGciOi...' }
+ *     UserProfileResponse: # Схема для /me
+ *       type: object
+ *       properties:
+ *         id: { type: integer, format: int64, example: 1 }
+ *         name: { type: string, example: "Иван Иванов" }
+ *         email: { type: string, format: email, example: "ivan.ivanov@example.com" }
+ *         createdAt: { type: string, format: date-time }
+ *         updatedAt: { type: string, format: date-time }
  *     ErrorResponse:
- *         type: object
- *         properties:
- *             message: { type: string, example: 'Ошибка сервера' }
- *             details: { type: any, nullable: true, example: 'Дополнительная информация | Массив ошибок валидации' }
- *             error: { type: string, nullable: true, example: 'Сообщение об ошибке (если применимо)' }
- *             stack: { type: string, nullable: true, example: 'Стек вызова (только в режиме разработки)' }
- *   responses:
- *      UnauthorizedError: { description: 'Ошибка авторизации', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
- *      ForbiddenError: { description: 'Ошибка доступа', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
- *      BadRequestError: { description: 'Неверный запрос', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
- *      NotFoundError: { description: 'Ресурс не найден', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
- *      ServerError: { description: 'Внутренняя ошибка сервера', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
+ *       type: object
+ *       properties:
+ *         message: { type: string, example: 'Ошибка сервера' }
+ *         details: { type: any, nullable: true, example: 'Дополнительная информация | Массив ошибок валидации' }
+ *         error: { type: string, nullable: true, example: 'Сообщение об ошибке (если применимо)' }
+ *         stack: { type: string, nullable: true, example: 'Стек вызова (только в режиме разработки)' }
+ *   responses: # Эти ответы должны быть определены в config/swagger.ts или здесь
+ *     UnauthorizedError: { description: 'Ошибка авторизации', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
+ *     ForbiddenError: { description: 'Ошибка доступа', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
+ *     BadRequestError: { description: 'Неверный запрос', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
+ *     NotFoundError: { description: 'Ресурс не найден', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
+ *     ServerError: { description: 'Внутренняя ошибка сервера', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
  *   securitySchemes:
- *      BearerAuth: { type: http, scheme: bearer, bearerFormat: JWT, description: "JWT токен доступа, полученный после успешного логина. Передается в заголовке Authorization: Bearer {token}" }
+ *     BearerAuth: { type: http, scheme: bearer, bearerFormat: JWT, description: "JWT токен доступа. Передается в заголовке Authorization: Bearer {token}" }
  */
 
 // --- Registration Route ---
@@ -162,100 +141,44 @@ const verifyRefreshToken = async (
  *   post:
  *     tags: [Auth]
  *     summary: Регистрация нового пользователя
- *     description: Создает нового пользователя. Пароль хешируется хуком в модели. Email должен быть уникальным.
+ *     description: Создает нового пользователя. Пароль хешируется. Email должен быть уникальным.
  *     requestBody:
  *       required: true
  *       description: Данные нового пользователя
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UserInput'
+ *             $ref: '#/components/schemas/RegisterInput'
  *     responses:
  *       '201':
  *         description: Пользователь зарегистрирован
  *         content: { application/json: { schema: { type: object, properties: { message: { type: string, example: "Пользователь зарегистрирован" }, user: { $ref: '#/components/schemas/User' }}}}}
- *       '400': { description: 'Ошибка валидации или email уже используется', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, examples: { validationError: { value: { message: "Ошибка валидации...", details: ["Сообщение ошибки 1", "Сообщение ошибки 2"] } }, emailExists: { value: { message: "Email уже используется" } } } } } }
+ *       '400': { description: 'Ошибка валидации или email уже используется', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+  // ... (ваш существующий код для /register, убедитесь, что next(error) используется для ошибок)
   try {
-    const { name, email, password } = req.body as {
-      name?: string;
-      email?: string;
-      password?: string;
-    };
-
+    const { name, email, password } = req.body as { name?: string; email?: string; password?: string; };
     if (!name || !email || !password) {
-      res
-        .status(400)
-        .json({ message: 'Поля name, email и password обязательны' });
-      return;
+      return res.status(400).json({ message: 'Поля name, email и password обязательны' });
     }
     if (typeof email !== 'string' || !/\S+@\S+\.\S+/.test(email)) {
-      res.status(400).json({ message: 'Неверный формат email' });
-      return;
+      return res.status(400).json({ message: 'Неверный формат email' });
     }
-
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ message: 'Email уже используется' });
-      return;
+      return res.status(400).json({ message: 'Email уже используется' });
     }
-
     const newUser = await User.create({ name, email, password });
-
     const newUserIdValue = newUser.get('id');
-
-    if (typeof newUserIdValue !== 'number') {
-      // console.error('[REGISTER] Failed: User created but ID is not a number...', newUser.toJSON());
-      throw new Error('Не удалось получить ID пользователя после создания.');
-    }
-    const newUserId: number = newUserIdValue;
-
+    if (typeof newUserIdValue !== 'number') { throw new Error('Не удалось получить ID пользователя после создания.'); }
     const userResponse: Omit<UserAttributes, 'password'> = {
-      id: newUserId,
-      name: newUser.get('name'),
-      email: newUser.get('email'),
-      createdAt: newUser.get('createdAt'),
-      updatedAt: newUser.get('updatedAt'),
+      id: newUserIdValue, name: newUser.get('name'), email: newUser.get('email'),
+      createdAt: newUser.get('createdAt'), updatedAt: newUser.get('updatedAt'),
     };
-
-    res
-      .status(201)
-      .json({ message: 'Пользователь зарегистрирован', user: userResponse });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'SequelizeValidationError') {
-      const validationError = error as SimpleSequelizeValidationError;
-      const errorMessages = Array.isArray(validationError.errors)
-        ? validationError.errors.map(
-            (e) => e?.message ?? 'Неизвестная ошибка валидации',
-          )
-        : ['Некорректный формат ошибок валидации'];
-
-      if (!res.headersSent) {
-        res.status(400).json({
-          message: 'Ошибка валидации при регистрации',
-          details: errorMessages,
-        });
-      }
-      return;
-    }
-
-    const errorMessage =
-      error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
-    const errorStack =
-      error instanceof Error && process.env.NODE_ENV === 'development'
-        ? error.stack
-        : undefined;
-
-    if (!res.headersSent) {
-      res.status(500).json({
-        message: 'Ошибка сервера при регистрации',
-        error: errorMessage,
-        stack: errorStack,
-      });
-    }
-  }
+    res.status(201).json({ message: 'Пользователь зарегистрирован', user: userResponse });
+  } catch (error) { next(error); } // Передаем ошибку глобальному обработчику
 });
 
 // --- Login Route ---
@@ -272,125 +195,46 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
  *       content: { application/json: { schema: { $ref: '#/components/schemas/LoginInput' }}}
  *     responses:
  *       '200': { description: 'Успешный вход', content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' }}}}
- *       '400': { description: 'Не предоставлены email или пароль', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { message: "Требуется email и пароль" } } } }
- *       '401': { description: 'Неверные учетные данные', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, examples: { userNotFound: { value: { message: "Неверные учетные данные (пользователь не найден)" }}, passwordMismatch: { value: { message: "Неверные учетные данные (пароль)" }} }} } }
+ *       '400': { $ref: '#/components/responses/BadRequestError' }
+ *       '401': { description: 'Неверные учетные данные', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}}
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+  // ... (ваш существующий код для /login, убедитесь, что next(error) используется для ошибок)
   try {
     const { email, password } = req.body as LoginRequestBody;
-
-    if (!email || !password) {
-      res.status(400).json({ message: 'Требуется email и пароль' });
-      return;
-    }
-
-    const userQueryResult: User | null = await User.scope(
-      'withPassword',
-    ).findOne({ where: { email } });
-
-    if (!userQueryResult) {
-      res
-        .status(401)
-        .json({ message: 'Неверные учетные данные (пользователь не найден)' });
-      return;
-    }
+    if (!email || !password) { return res.status(400).json({ message: 'Требуется email и пароль' });}
+    const userQueryResult: User | null = await User.scope('withPassword').findOne({ where: { email } });
+    if (!userQueryResult) { return res.status(401).json({ message: 'Неверные учетные данные (пользователь не найден)' });}
     const confirmedUser: User = userQueryResult;
-
     const isMatch = await confirmedUser.comparePassword(password);
-    if (!isMatch) {
-      res.status(401).json({ message: 'Неверные учетные данные (пароль)' });
-      return;
-    }
-
+    if (!isMatch) { return res.status(401).json({ message: 'Неверные учетные данные (пароль)' });}
     const userIdValue = confirmedUser.get('id');
-
-    if (typeof userIdValue !== 'number') {
-      // console.error(`[LOGIN] CRITICAL ERROR: User ID is NOT a number after get()...`); // Убрано
-      throw new Error(
-        `Внутренняя ошибка сервера: не удалось обработать ID пользователя.`,
-      );
-    }
+    if (typeof userIdValue !== 'number') { throw new Error('Внутренняя ошибка сервера: не удалось обработать ID пользователя.');}
     const userId: number = userIdValue;
-
-    // Генерация токенов
     const jwtSecret = process.env.JWT_SECRET;
-    const accessExpiresInString =
-      process.env.JWT_ACCESS_EXPIRES_SECONDS || '900';
-    const refreshExpiresInString =
-      process.env.JWT_REFRESH_EXPIRES_SECONDS || '604800';
-
-    if (!jwtSecret) {
-      console.error('[LOGIN] CRITICAL ERROR: JWT_SECRET not set!'); // Оставляем
-      throw new Error('Ошибка конфигурации сервера JWT.');
-    }
-
+    const accessExpiresInString = process.env.JWT_ACCESS_EXPIRES_SECONDS || '900';
+    const refreshExpiresInString = process.env.JWT_REFRESH_EXPIRES_SECONDS || '604800';
+    if (!jwtSecret) { console.error('[LOGIN] CRITICAL ERROR: JWT_SECRET not set!'); throw new Error('Ошибка конфигурации сервера JWT.');}
     const accessExpiresInSeconds = parseInt(accessExpiresInString, 10);
     const refreshExpiresInSeconds = parseInt(refreshExpiresInString, 10);
-    if (isNaN(accessExpiresInSeconds) || isNaN(refreshExpiresInSeconds)) {
-      console.error(
-        '[LOGIN] CRITICAL ERROR: Invalid JWT expiration time configuration.',
-      ); // Оставляем
-      throw new Error('Ошибка конфигурации времени жизни токена.');
-    }
-
+    if (isNaN(accessExpiresInSeconds) || isNaN(refreshExpiresInSeconds)) { console.error('[LOGIN] CRITICAL ERROR: Invalid JWT expiration time configuration.'); throw new Error('Ошибка конфигурации времени жизни токена.');}
     const payload: UserJwtPayload = { id: userId };
-    const accessTokenOptions: SignOptions = {
-      expiresIn: accessExpiresInSeconds,
-    };
-    const refreshTokenOptions: SignOptions = {
-      expiresIn: refreshExpiresInSeconds,
-    };
-
+    const accessTokenOptions: SignOptions = { expiresIn: accessExpiresInSeconds };
+    const refreshTokenOptions: SignOptions = { expiresIn: refreshExpiresInSeconds };
     const accessToken = jwt.sign(payload, jwtSecret, accessTokenOptions);
-    const refreshToken = jwt.sign(
-      { id: userId },
-      jwtSecret,
-      refreshTokenOptions,
-    );
+    const refreshToken = jwt.sign({ id: userId }, jwtSecret, refreshTokenOptions);
     const expiresAt = new Date(Date.now() + refreshExpiresInSeconds * 1000);
-
     try {
       await RefreshToken.destroy({ where: { userId: userId } });
-      await RefreshToken.create({
-        token: refreshToken,
-        userId: userId,
-        expiresAt,
-      });
-    } catch {
-      // <-- Убираем переменную _dbError
-      throw new Error('Ошибка при обновлении сессии пользователя.');
-    }
-
+      await RefreshToken.create({ token: refreshToken, userId: userId, expiresAt });
+    } catch { throw new Error('Ошибка при обновлении сессии пользователя.'); }
     const userResponse: Omit<UserAttributes, 'password'> = {
-      id: userId,
-      name: confirmedUser.get('name'),
-      email: confirmedUser.get('email'),
-      createdAt: confirmedUser.get('createdAt'),
-      updatedAt: confirmedUser.get('updatedAt'),
+      id: userId, name: confirmedUser.get('name'), email: confirmedUser.get('email'),
+      createdAt: confirmedUser.get('createdAt'), updatedAt: confirmedUser.get('updatedAt'),
     };
-
-    res.json({
-      accessToken: `Bearer ${accessToken}`,
-      refreshToken,
-      user: userResponse,
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
-    const errorStack =
-      error instanceof Error && process.env.NODE_ENV === 'development'
-        ? error.stack
-        : undefined;
-
-    if (!res.headersSent) {
-      res.status(500).json({
-        message: 'Ошибка сервера при входе в систему',
-        error: errorMessage,
-        stack: errorStack,
-      });
-    }
-  }
+    res.json({ accessToken: `Bearer ${accessToken}`, refreshToken, user: userResponse });
+  } catch (error) { next(error); } // Передаем ошибку глобальному обработчику
 });
 
 // --- Refresh Token Route ---
@@ -404,77 +248,138 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
  *     requestBody:
  *       required: true
  *       description: Refresh token для обновления access token
- *       content: { application/json: { schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string, description: 'Валидный refresh token', example: 'eyJhbGciOi...' }}}}}
+ *       content: { application/json: { schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string }}}}}
  *     responses:
  *       '200': { description: 'Access token успешно обновлен', content: { application/json: { schema: { $ref: '#/components/schemas/RefreshResponse' }}}}
- *       '401': { description: 'Refresh token не предоставлен, недействителен или истек', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+ *       '401': { $ref: '#/components/responses/UnauthorizedError' }
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
-router.post(
-  '/refresh',
-  verifyRefreshToken,
-  async (req: Request, res: Response): Promise<void> => {
+router.post('/refresh', verifyRefreshToken, async (req: Request, res: Response, next: NextFunction) => {
+    // ... (ваш существующий код для /refresh, убедитесь, что next(error) используется для ошибок)
     const userPayload = req.user as UserJwtPayload | undefined;
-
     if (!userPayload?.id || typeof userPayload.id !== 'number') {
-      res.status(401).json({
-        message:
-          'Ошибка аутентификации refresh token (неверные данные пользователя)',
-      });
-      return;
+      return res.status(401).json({ message: 'Ошибка аутентификации refresh token (неверные данные пользователя)' });
     }
-
     const userIdFromToken: number = userPayload.id;
-
     try {
       const jwtSecret = process.env.JWT_SECRET;
-      const accessExpiresInString =
-        process.env.JWT_ACCESS_EXPIRES_SECONDS || '900';
-
-      if (!jwtSecret) {
-        console.error('[REFRESH] CRITICAL ERROR: JWT_SECRET not set!');
-        throw new Error('Ошибка конфигурации сервера JWT.');
-      }
-
+      const accessExpiresInString = process.env.JWT_ACCESS_EXPIRES_SECONDS || '900';
+      if (!jwtSecret) { console.error('[REFRESH] CRITICAL ERROR: JWT_SECRET not set!'); throw new Error('Ошибка конфигурации сервера JWT.');}
       const accessExpiresInSeconds = parseInt(accessExpiresInString, 10);
-      if (isNaN(accessExpiresInSeconds)) {
-        console.error(
-          '[REFRESH] CRITICAL ERROR: Invalid JWT access token expiration time.',
-        ); // Оставляем
-        throw new Error('Ошибка конфигурации времени жизни токена.');
-      }
-
+      if (isNaN(accessExpiresInSeconds)) { console.error('[REFRESH] CRITICAL ERROR: Invalid JWT access token expiration time.'); throw new Error('Ошибка конфигурации времени жизни токена.');}
       const newPayload: UserJwtPayload = { id: userIdFromToken };
-      const newAccessTokenOptions: SignOptions = {
-        expiresIn: accessExpiresInSeconds,
-      };
-      const newAccessToken = jwt.sign(
-        newPayload,
-        jwtSecret,
-        newAccessTokenOptions,
-      );
-
+      const newAccessTokenOptions: SignOptions = { expiresIn: accessExpiresInSeconds };
+      const newAccessToken = jwt.sign(newPayload, jwtSecret, newAccessTokenOptions);
       res.json({ accessToken: `Bearer ${newAccessToken}` });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
-      const errorStack =
-        error instanceof Error && process.env.NODE_ENV === 'development'
-          ? error.stack
-          : undefined;
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          message: 'Ошибка сервера при обновлении токена',
-          error: errorMessage,
-          stack: errorStack,
-        });
-      }
-    }
+    } catch (error) { next(error); } // Передаем ошибку глобальному обработчику
   },
 );
 
+// --- НОВЫЙ МАРШРУТ: GET /api/auth/me ---
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Получить данные текущего аутентифицированного пользователя
+ *     description: Возвращает информацию о пользователе, чей JWT токен используется. Пароль не возвращается.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Успешный ответ с данными пользователя
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserProfileResponse'
+ *       '401': { $ref: '#/components/responses/UnauthorizedError' }
+ *       '404': { $ref: '#/components/responses/NotFoundError' }
+ *       '500': { $ref: '#/components/responses/ServerError' }
+ */
+router.get(
+  '/me',
+  passport.authenticate('jwt', { session: false }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userPayload = req.user as UserJwtPayload | undefined;
+
+      if (!userPayload || typeof userPayload.id !== 'number') {
+        return res.status(401).json({ message: 'Ошибка аутентификации: неверные данные пользователя в токене' });
+      }
+
+      const userId = userPayload.id;
+      const user = await User.findByPk(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'Пользователь не найден' });
+      }
+
+      const userProfile: Omit<UserAttributes, 'password'> = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+
+      res.status(200).json(userProfile);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+/**
+ * @openapi
+ * /api/auth/me/events:
+ *   get:
+ *     tags: [Auth, Events] # Можно добавить тег Events
+ *     summary: Получить список мероприятий, созданных текущим пользователем
+ *     description: Возвращает список всех мероприятий, где поле 'createdBy' совпадает с ID аутентифицированного пользователя.
+ *     security:
+ *       - BearerAuth: [] # Требует JWT
+ *     responses:
+ *       '200':
+ *         description: Успешный ответ со списком мероприятий пользователя
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/EventModel' # Ссылка на схему мероприятия
+ *       '401':
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get(
+  '/me/events',
+  passport.authenticate('jwt', { session: false }), // Защищаем маршрут
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userPayload = req.user as UserJwtPayload | undefined;
+
+      if (!userPayload || typeof userPayload.id !== 'number') {
+        // Эта проверка дублирует то, что делает passport, но для надежности
+        return res.status(401).json({ message: 'Ошибка аутентификации: неверные данные пользователя в токене' });
+      }
+
+      const userId = userPayload.id;
+
+      // Ищем все мероприятия, созданные этим пользователем
+      // Предполагается, что EventModel импортирована из '@models/event' или '../models/event'
+      // и имеет поле createdBy
+      const userEvents = await EventModel.findAll({
+        where: {
+          createdBy: userId,
+        },
+        order: [['date', 'DESC']], // Опционально: сортируем по дате, сначала новые
+      });
+
+      res.status(200).json(userEvents);
+    } catch (error) {
+      next(error); // Передаем ошибку глобальному обработчику
+    }
+  }
+);
 // --- Экспорт роутера ---
 export default router;
-
-// --- END OF FILE routes/auth.ts ---

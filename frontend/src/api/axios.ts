@@ -1,12 +1,12 @@
 // src/api/axios.ts
-import axios from 'axios'; 
-import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { getToken } from '../utils/storage';
+import axios from "axios";
+import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { getToken } from "../utils/storage";
 
 const apiInstance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL, // Используем переменную окружения
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -23,6 +23,5 @@ apiInstance.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-
 
 export default apiInstance;

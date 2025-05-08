@@ -1,8 +1,8 @@
 // src/utils/storage.ts
 
-const TOKEN_KEY = 'authToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const USER_KEY = 'authUser';
+const TOKEN_KEY = "authToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
+const USER_KEY = "authUser";
 
 // --- Auth Token ---
 export const getToken = (): string | null => {

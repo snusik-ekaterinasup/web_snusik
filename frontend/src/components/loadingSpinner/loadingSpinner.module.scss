@@ -1,0 +1,24 @@
+// src/components/loadingSpinner/loadingSpinner.module.scss
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem; // Добавляем отступы
+  text-align: center;
+  width: 100%; // Занимаем доступную ширину для центрирования
+  box-sizing: border-box;
+  min-height: 150px; // Минимальная высота, чтобы было видно на пустых секциях
+}
+
+.loadingText {
+  margin-top: 1rem !important; // Используем !important, если стили MUI перебивают
+  color: #555; // Цвет текста
+  font-size: 1rem;
+}
+
+// Можно добавить стили для изменения цвета спиннера, если нужно
+// :global(.MuiCircularProgress-root) {
+//   color: #ващ-цвет !important;
+// }

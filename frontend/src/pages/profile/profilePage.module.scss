@@ -1,0 +1,120 @@
+// src/pages/profile/profilePage.module.scss
+
+// Общие стили контейнера и основного контента (можно вынести в глобальные или Layout)
+.profilePageContainer {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f4f6f8;
+}
+
+.mainContent {
+  flex-grow: 1;
+  padding: 2rem;
+  max-width: 1200px; // Ограничиваем максимальную ширину контента
+  margin: 0 auto; // Центрируем контент
+  width: 100%;
+  box-sizing: border-box;
+
+  h1 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #34495e;
+  }
+}
+
+// Секция с информацией о пользователе
+.userInfoSection {
+  background-color: #ffffff;
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.07);
+
+  h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+}
+
+.infoBox {
+  p {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+    color: #555;
+
+    strong {
+      color: #333;
+      margin-right: 0.5em;
+    }
+  }
+}
+
+// Секция с мероприятиями пользователя
+.userEventsSection {
+  h2 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+}
+
+.createButtonContainer {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.createEventButtonProfile {
+  // Можно переиспользовать стиль кнопки с EventsPage или задать свой
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  background-color: #007bff; // Синий, как на EventsPage или другой
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 5px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #0056b3;
+  }
+}
+
+// Стили для лоадера/сообщений об ошибках, если нужны специфичные
+.loading {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+  color: #555;
+}
+
+// Стили для карточек и их элементов наследуются или импортируются из events.module.scss
+// Убедитесь, что импорт eventCardStyles корректно работает или скопируйте/адаптируйте нужные стили сюда.
+
+// Адаптивность
+@media (max-width: 768px) {
+  .mainContent {
+    padding: 1rem;
+    h1 {
+      font-size: 1.8rem;
+    }
+  }
+  .userInfoSection,
+  .userEventsSection {
+    padding: 1rem 1.5rem;
+    h2 {
+      font-size: 1.3rem;
+    }
+  }
+}

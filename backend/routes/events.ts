@@ -1,48 +1,47 @@
-// --- START OF FILE routes/events.ts ---
+// src/routes/events.ts
 
 import express, { Router, Request, Response } from 'express';
 import passport from 'passport';
-// import { Op } from 'sequelize'; // Не используется
+import { Sequelize } from 'sequelize'; // Для функций агрегации
 
-// Импортируем модель и middleware (убедитесь, что путь верный)
-import { EventModel, apiKeyAuth } from '@models/event';
+// Импортируем модели, middleware и типы
+import { EventModel, apiKeyAuth, EventCreationAttributes } from '@models/event'; // Добавляем EventCreationAttributes
+import { User } from '@models/user';
+import { EventParticipant } from '@models/eventParticipant';
+import type { UserJwtPayload } from './auth'; // Предполагаем, что тип экспортируется из auth.ts или общего файла типов
+import type { ValidationError } from 'sequelize'; // Для обработки ошибок валидации
+import type { EventAttributes } from '@models/event';
+// --- Интерфейсы (Дублирование для ясности, лучше вынести в общие типы) ---
 
-// --- Интерфейсы ---
+// Для тела запроса при создании события
+interface CreateEventRequestBody extends Omit<EventCreationAttributes, 'createdBy'> {}
 
-// Интерфейс для данных при создании события (из req.body)
-interface CreateEventRequestBody {
-  title: string;
-  description?: string | null;
-  date: string; // Ожидаем строку ISO 8601
-  category: 'concert' | 'lecture' | 'exhibition';
-}
-
-// Интерфейс для данных при обновлении события (из req.body)
+// Для тела запроса при обновлении события (все поля опциональны)
 interface UpdateEventRequestBody {
   title?: string;
   description?: string | null;
-  date?: string | null; // Строка ISO 8601 или null
+  date?: string | null; // Строка ISO 8601 или null для сброса
   category?: 'concert' | 'lecture' | 'exhibition';
 }
 
-// Интерфейс для payload пользователя из JWT (копия того, что в types/express/index.d.ts)
-interface UserJwtPayload {
-  id: number; // Или string
-  role?: string;
-}
-
-// Интерфейс для ошибки валидации Sequelize (упрощенный, для избежания any)
+// Для ошибки валидации Sequelize
 interface SimpleSequelizeValidationError extends Error {
   name: 'SequelizeValidationError';
-  errors?: Array<{ message?: string }>; // Массив объектов с сообщением
+  errors?: Array<{ message?: string; path?: string }>;
 }
 
 // --- Инициализация роутера ---
 const router: Router = express.Router();
 
-// --- Применение Middleware ---
-// Применяем проверку API Key ко всем роутам в этом файле
-router.use(apiKeyAuth);
+// --- Swagger Tag Definition ---
+/**
+ * @openapi
+ * tags:
+ *   - name: Events
+ *     description: Управление мероприятиями (создание, получение, обновление, удаление)
+ *   - name: Events Participation
+ *     description: Регистрация и отмена регистрации пользователей на мероприятия
+ */
 
 // --- Маршруты ---
 
@@ -52,8 +51,12 @@ router.use(apiKeyAuth);
  * /api/events:
  *   get:
  *     tags: [Events]
- *     summary: Список мероприятий с фильтрацией по категории
- *     description: Получает список мероприятий. Требует API ключ. Фильтрация по 'category'.
+ *     summary: Список мероприятий с фильтрацией и информацией об участии
+ *     description: >
+ *       Получает список мероприятий. Требует API ключ.
+ *       Фильтрация по 'category'.
+ *       Для аутентифицированных пользователей добавляет поле 'isCurrentUserParticipating'.
+ *       Всегда добавляет поле 'participantsCount'.
  *     parameters:
  *       - in: query
  *         name: category
@@ -61,40 +64,92 @@ router.use(apiKeyAuth);
  *         required: false
  *         description: Фильтр по категории
  *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     security:
+ *       - BearerAuth: [] # Опционально - если токен есть, получим isCurrentUserParticipating
  *     responses:
  *       '200':
  *         description: Список мероприятий
- *         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EventModel' }}}}
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 allOf: # Комбинируем схему EventModel с доп. полями
+ *                   - $ref: '#/components/schemas/EventModel'
+ *                   - type: object
+ *                     properties:
+ *                       participantsCount: { type: integer, readOnly: true }
+ *                       isCurrentUserParticipating: { type: boolean, readOnly: true }
  *       '400': { $ref: '#/components/responses/BadRequestError' }
- *       '401': { $ref: '#/components/responses/UnauthorizedError' }
- *       '403': { $ref: '#/components/responses/ForbiddenError' }
+ *       '401': { description: "Может вернуться, если Bearer токен предоставлен, но невалиден", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}} } # JWT необязателен, но если есть - валидируется
+ *       '403': { $ref: '#/components/responses/ForbiddenError' } # Ошибка API Key
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
-router.get('/', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const category = req.query.category as string | undefined;
-    const whereClause: { category?: string } = {};
+router.get(
+  '/',
+  passport.authenticate(['jwt', 'anonymous'], { session: false }), // Позволяет анонимный доступ, но проверяет JWT если он есть
+  apiKeyAuth, // Проверка API ключа
+  async (req: Request, res: Response): Promise<void> => {
+    const currentUserPayload = req.user as UserJwtPayload | undefined;
+    const currentUserId = currentUserPayload?.id;
 
-    if (category) {
-      if (!['concert', 'lecture', 'exhibition'].includes(category)) {
-        res.status(400).json({
-          message: `Недопустимое значение для категории: ${category}`,
-        });
-        return;
+    try {
+      const category = req.query.category as string | undefined;
+      const whereClause: { category?: string } = {};
+
+      if (category) {
+        if (!['concert', 'lecture', 'exhibition'].includes(category)) {
+          res.status(400).json({ message: `Недопустимое значение для категории: ${category}` });
+          return;
+        }
+        whereClause.category = category;
       }
-      whereClause.category = category;
-    }
 
-    const events = await EventModel.findAll({ where: whereClause });
-    res.status(200).json(events);
-  } catch /* istanbul ignore next */ {
-    // Убрано имя переменной 'error', т.к. не используется
-    // console.error('Ошибка GET /api/events:', error); // Закомментировано для no-console
-    res
-      .status(500)
-      .json({ message: 'Ошибка сервера при получении мероприятий' });
+      const events = await EventModel.findAll({
+        where: whereClause,
+        attributes: {
+          include: [[
+            Sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM "event_participants" AS ep
+              WHERE ep."eventId" = "EventModel"."id"
+            )`),
+            'participantsCount'
+          ]],
+        },
+        include: [ // Включаем создателя для информации на карточке
+           { model: User, as: 'creator', attributes: ['id', 'name'] }
+        ],
+        order: [['date', 'DESC'], ['createdAt', 'DESC']], // Сортировка по дате, затем по времени создания
+      });
+
+      // Определение участий текущего пользователя
+      let userParticipations: Set<number> = new Set(); // Используем Set для быстрого поиска
+      if (currentUserId) {
+        const participations = await EventParticipant.findAll({
+          where: { userId: currentUserId },
+          attributes: ['eventId'],
+        });
+        userParticipations = new Set(participations.map(p => p.eventId));
+      }
+
+      // Добавляем поля к каждому событию
+      const eventsWithParticipation = events.map(event => {
+        const eventJson = event.toJSON() as any;
+        eventJson.isCurrentUserParticipating = userParticipations.has(event.id);
+        // participantsCount уже есть, но может быть строкой, приводим к числу
+        eventJson.participantsCount = parseInt(eventJson.participantsCount || '0', 10);
+        return eventJson;
+      });
+
+      res.status(200).json(eventsWithParticipation);
+    } catch (error) {
+      console.error('[API_ERROR] GET /api/events:', error);
+      res.status(500).json({ message: 'Ошибка сервера при получении мероприятий' });
+    }
   }
-});
+);
+
 
 // --- GET /api/events/:id ---
 /**
@@ -103,8 +158,9 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  *   get:
  *     tags: [Events]
  *     summary: Получить мероприятие по ID
- *     description: Получает детали одного мероприятия. Требует API ключ.
- *     security:
+ *     description: >
+ *       Получает детали одного мероприятия. Требует API ключ.
+ *       Включает количество участников и флаг участия текущего пользователя (если аутентифицирован).
  *     parameters:
  *       - in: path
  *         name: id
@@ -113,37 +169,81 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  *         description: ID мероприятия
  *         example: 1
  *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     security:
+ *       - BearerAuth: [] # Опционально
  *     responses:
  *       '200':
  *         description: Мероприятие найдено
- *         content: { application/json: { schema: { $ref: '#/components/schemas/EventModel' }}}
+ *         content:
+ *           application/json:
+ *             schema:
+ *                allOf:
+ *                  - $ref: '#/components/schemas/EventModel'
+ *                  - type: object
+ *                    properties:
+ *                       participantsCount: { type: integer, readOnly: true }
+ *                       isCurrentUserParticipating: { type: boolean, readOnly: true }
  *       '400': { $ref: '#/components/responses/BadRequestError' }
- *       '401': { $ref: '#/components/responses/UnauthorizedError' }
+ *       '401': { description: "Может вернуться, если Bearer токен предоставлен, но невалиден", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}} }
  *       '403': { $ref: '#/components/responses/ForbiddenError' }
  *       '404': { $ref: '#/components/responses/NotFoundError' }
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
-router.get('/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const eventId = parseInt(req.params.id, 10);
-    if (isNaN(eventId)) {
-      res.status(400).json({ message: 'ID мероприятия должен быть числом' });
-      return;
-    }
+router.get(
+    '/:id',
+    passport.authenticate(['jwt', 'anonymous'], { session: false }),
+    apiKeyAuth,
+    async (req: Request, res: Response): Promise<void> => {
+    const currentUserPayload = req.user as UserJwtPayload | undefined;
+    const currentUserId = currentUserPayload?.id;
 
-    const event = await EventModel.findByPk(eventId);
-    if (!event) {
-      res.status(404).json({ message: 'Мероприятие не найдено' });
-      return;
+    try {
+      const eventId = parseInt(req.params.id, 10);
+      if (isNaN(eventId)) {
+        res.status(400).json({ message: 'ID мероприятия должен быть числом' });
+        return;
+      }
+
+      const event = await EventModel.findByPk(eventId, {
+        attributes: {
+          include: [[
+            Sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM "event_participants" AS ep
+              WHERE ep."eventId" = "EventModel"."id"
+            )`),
+            'participantsCount'
+          ]],
+        },
+         include: [
+           { model: User, as: 'creator', attributes: ['id', 'name'] }
+         ]
+      });
+
+      if (!event) {
+        res.status(404).json({ message: 'Мероприятие не найдено' });
+        return;
+      }
+
+      // Проверяем участие текущего пользователя
+      let isCurrentUserParticipating = false;
+      if (currentUserId) {
+        const participation = await EventParticipant.findOne({
+          where: { userId: currentUserId, eventId: event.id }
+        });
+        isCurrentUserParticipating = !!participation;
+      }
+
+      const eventJson = event.toJSON() as any;
+      eventJson.isCurrentUserParticipating = isCurrentUserParticipating;
+      eventJson.participantsCount = parseInt(eventJson.participantsCount || '0', 10);
+
+
+      res.status(200).json(eventJson);
+    } catch (error) {
+      console.error(`[API_ERROR] GET /api/events/${req.params.id}:`, error);
+      res.status(500).json({ message: 'Ошибка сервера при получении мероприятия' });
     }
-    res.status(200).json(event);
-  } catch /* istanbul ignore next */ {
-    // Убрано имя переменной 'error', т.к. не используется
-    // console.error(`Ошибка GET /api/events/${req.params.id}:`, error); // Закомментировано для no-console
-    res
-      .status(500)
-      .json({ message: 'Ошибка сервера при получении мероприятия' });
-  }
 });
 
 // --- POST /api/events ---
@@ -156,16 +256,18 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
  *     description: Создает мероприятие. Требует API ключ и JWT токен.
  *     parameters:
  *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateEventInput'
+ *             $ref: '#/components/schemas/CreateEventInput' # Должен быть определен в event.ts или swagger.ts
  *     responses:
  *       '201':
  *         description: Мероприятие создано
- *         content: { application/json: { schema: { $ref: '#/components/schemas/EventModel' }}}
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/EventModel' }}} # Возвращаем созданный объект
  *       '400': { $ref: '#/components/responses/BadRequestError' }
  *       '401': { $ref: '#/components/responses/UnauthorizedError' }
  *       '403': { $ref: '#/components/responses/ForbiddenError' }
@@ -174,69 +276,58 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 router.post(
   '/',
   passport.authenticate('jwt', { session: false }),
+  apiKeyAuth,
   async (req: Request, res: Response): Promise<void> => {
-    // Утверждаем тип req.user (предполагается, что расширение модуля настроено)
     const userPayload = req.user as UserJwtPayload | undefined;
-    if (!userPayload?.id) {
-      res.status(401).json({ message: 'Ошибка аутентификации JWT' });
+    const createdBy = userPayload?.id;
+    if (!createdBy) {
+      res.status(401).json({ message: 'Ошибка аутентификации JWT (нет ID пользователя)' });
       return;
     }
 
     try {
-      const createdBy = userPayload.id;
-      // Используем интерфейс для тела запроса
       const requestBody = req.body as CreateEventRequestBody;
 
-      // Простая проверка обязательных полей
-      if (!requestBody.title || !requestBody.category || !requestBody.date) {
-        res
-          .status(400)
-          .json({ message: 'Поля title, category, date обязательны' });
+      // Базовая проверка наличия обязательных полей (дополнительная к валидации модели)
+      if (!requestBody.title || !requestBody.category) {
+        res.status(400).json({ message: 'Поля title и category обязательны' });
         return;
       }
 
-      // Конвертируем строку даты в объект Date и проверяем
-      const dateObject = new Date(requestBody.date);
-      if (isNaN(dateObject.getTime())) {
-        res.status(400).json({
-          message: 'Неверный формат даты. Ожидается строка в формате ISO 8601.',
-        });
-        return;
+      // Обработка и валидация даты, если она передана
+      let dateObject: Date | null = null;
+      if (requestBody.date) {
+         dateObject = new Date(requestBody.date);
+         if (isNaN(dateObject.getTime())) {
+            res.status(400).json({ message: 'Неверный формат даты. Ожидается строка в формате ISO 8601.' });
+            return;
+         }
       }
 
-      // Собираем данные для Sequelize
-      const newEventData = {
+      const newEventData: EventCreationAttributes = {
         title: requestBody.title,
-        description: requestBody.description,
-        date: dateObject, // Передаем объект Date
+        description: requestBody.description ?? null, // Убедимся, что null если нет
+        date: dateObject, // Передаем Date или null
         category: requestBody.category,
-        createdBy,
+        createdBy: createdBy,
       };
 
       const newEvent = await EventModel.create(newEventData);
-      res.status(201).json(newEvent);
+      res.status(201).json(newEvent); // Возвращаем созданный объект
     } catch (error) {
-      // Оставляем 'error', так как он используется ниже
-      // console.error('Ошибка POST /api/events:', error); // Закомментировано для no-console
-      // Обработка ошибок валидации Sequelize
-      if (error instanceof Error && error.name === 'SequelizeValidationError') {
-        const validationError = error as SimpleSequelizeValidationError; // Используем интерфейс
+       if (error instanceof Error && error.name === 'SequelizeValidationError') {
+        const validationError = error as unknown as SimpleSequelizeValidationError; // Приведение типа
         const validationErrors = Array.isArray(validationError.errors)
-          ? validationError.errors.map(
-              (e) => e?.message ?? 'Unknown validation error',
-            )
+          ? validationError.errors.map(e => e?.message ?? 'Unknown validation error')
           : ['Validation error'];
-        res.status(400).json({
-          message: 'Ошибка валидации данных',
-          details: validationErrors,
-        });
-        return;
+        res.status(400).json({ message: 'Ошибка валидации данных', details: validationErrors });
+      } else {
+        console.error('[API_ERROR] POST /api/events:', error);
+        const message = error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
+        res.status(500).json({ message: 'Ошибка сервера при создании мероприятия', details: message });
       }
-      res
-        .status(500)
-        .json({ message: 'Ошибка сервера при создании мероприятия' });
     }
-  },
+  }
 );
 
 // --- PUT /api/events/:id ---
@@ -246,7 +337,7 @@ router.post(
  *   put:
  *     tags: [Events]
  *     summary: Обновить существующее мероприятие
- *     description: Обновляет мероприятие по ID. Требует API ключ и JWT токен.
+ *     description: Обновляет мероприятие по ID. Требует API ключ и JWT токен. Редактировать может только создатель.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -261,23 +352,25 @@ router.post(
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UpdateEventInput'
+ *             $ref: '#/components/schemas/UpdateEventInput' # Должен быть определен
  *     responses:
  *       '200':
  *         description: Мероприятие обновлено
  *         content: { application/json: { schema: { $ref: '#/components/schemas/EventModel' }}}
  *       '400': { $ref: '#/components/responses/BadRequestError' }
  *       '401': { $ref: '#/components/responses/UnauthorizedError' }
- *       '403': { $ref: '#/components/responses/ForbiddenError' }
+ *       '403': { description: 'Нет прав на редактирование (не создатель) или неверный API ключ' }
  *       '404': { $ref: '#/components/responses/NotFoundError' }
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
 router.put(
   '/:id',
   passport.authenticate('jwt', { session: false }),
+  apiKeyAuth,
   async (req: Request, res: Response): Promise<void> => {
     const userPayload = req.user as UserJwtPayload | undefined;
-    if (!userPayload?.id) {
+    const currentUserId = userPayload?.id;
+     if (!currentUserId) {
       res.status(401).json({ message: 'Ошибка аутентификации JWT' });
       return;
     }
@@ -295,83 +388,61 @@ router.put(
         return;
       }
 
-      // --- Optional Authorization Check ---
-      // if (event.createdBy !== userPayload.id) {
-      //   res.status(403).json({ message: "У вас нет прав на редактирование" }); return;
-      // }
+      // Проверка прав: редактировать может только создатель
+      if (event.createdBy !== currentUserId) {
+        res.status(403).json({ message: 'У вас нет прав на редактирование этого мероприятия' });
+        return;
+      }
 
-      // Используем интерфейс для тела запроса
       const requestBody = req.body as UpdateEventRequestBody;
+      const updatePayload: Partial<EventAttributes> = {}; // Используем Partial для удобства
 
-      // Создаем объект ТОЛЬКО с теми полями, которые пришли в запросе и разрешены для обновления
-      // Тип Partial<EventAttributes> здесь может быть слишком строгим, используем объект
-      const updatePayload: { [key: string]: string | Date | null | undefined } =
-        {};
-
-      // Явно проверяем и добавляем каждое поле
-      if (requestBody.title !== undefined)
-        updatePayload.title = requestBody.title;
-      if (requestBody.description !== undefined)
-        updatePayload.description = requestBody.description;
+      // Валидируем и добавляем поля, если они есть в запросе
+      if (requestBody.title !== undefined) updatePayload.title = requestBody.title;
+      if (requestBody.description !== undefined) updatePayload.description = requestBody.description; // Может быть null
       if (requestBody.category !== undefined) {
-        if (
-          !['concert', 'lecture', 'exhibition'].includes(requestBody.category)
-        ) {
-          res.status(400).json({
-            message: `Недопустимое значение для категории: ${requestBody.category}`,
-          });
-          return;
-        }
-        updatePayload.category = requestBody.category;
-      }
-      // Обрабатываем дату отдельно
-      if (requestBody.date !== undefined) {
-        if (requestBody.date === null) {
-          updatePayload.date = null; // Разрешаем сброс даты
-        } else {
-          const dateObject = new Date(requestBody.date);
-          if (isNaN(dateObject.getTime())) {
-            res.status(400).json({
-              message:
-                'Неверный формат даты для обновления. Ожидается строка ISO 8601 или null.',
-            });
+         if (!['concert', 'lecture', 'exhibition'].includes(requestBody.category)) {
+            res.status(400).json({ message: `Недопустимое значение для категории: ${requestBody.category}` });
             return;
-          }
-          updatePayload.date = dateObject; // Добавляем объект Date
-        }
+         }
+         updatePayload.category = requestBody.category;
       }
+       if (requestBody.date !== undefined) {
+         if (requestBody.date === null) {
+             updatePayload.date = null;
+         } else {
+             const dateObject = new Date(requestBody.date);
+             if (isNaN(dateObject.getTime())) {
+                 res.status(400).json({ message: 'Неверный формат даты для обновления. Ожидается строка ISO 8601 или null.' });
+                 return;
+             }
+             updatePayload.date = dateObject;
+         }
+       }
 
-      // Проверяем, есть ли вообще что обновлять
+
       if (Object.keys(updatePayload).length === 0) {
         res.status(400).json({ message: 'Нет данных для обновления' });
         return;
       }
 
-      // Передаем подготовленный объект в update
       await event.update(updatePayload);
       res.status(200).json(event); // Возвращаем обновленный event
+
     } catch (error) {
-      // Оставляем 'error', так как он используется ниже
-      // console.error(`Ошибка PUT /api/events/${req.params.id}:`, error); // Закомментировано для no-console
-      // Обработка ошибок валидации Sequelize
-      if (error instanceof Error && error.name === 'SequelizeValidationError') {
-        const validationError = error as SimpleSequelizeValidationError;
-        const validationErrors = Array.isArray(validationError.errors)
-          ? validationError.errors.map(
-              (e) => e?.message ?? 'Unknown validation error',
-            )
-          : ['Validation error'];
-        res.status(400).json({
-          message: 'Ошибка валидации данных при обновлении',
-          details: validationErrors,
-        });
-        return;
+       if (error instanceof Error && error.name === 'SequelizeValidationError') {
+         const validationError = error as unknown as SimpleSequelizeValidationError;
+         const validationErrors = Array.isArray(validationError.errors)
+           ? validationError.errors.map(e => e?.message ?? 'Unknown validation error')
+           : ['Validation error'];
+         res.status(400).json({ message: 'Ошибка валидации данных при обновлении', details: validationErrors });
+      } else {
+        console.error(`[API_ERROR] PUT /api/events/${req.params.id}:`, error);
+        const message = error instanceof Error ? error.message : 'Неизвестная ошибка сервера';
+        res.status(500).json({ message: 'Ошибка сервера при обновлении мероприятия', details: message });
       }
-      res
-        .status(500)
-        .json({ message: 'Ошибка сервера при обновлении мероприятия' });
     }
-  },
+  }
 );
 
 // --- DELETE /api/events/:id ---
@@ -381,7 +452,7 @@ router.put(
  *   delete:
  *     tags: [Events]
  *     summary: Удалить мероприятие
- *     description: Удаляет мероприятие по ID. Требует API ключ и JWT токен.
+ *     description: Удаляет мероприятие по ID. Требует API ключ и JWT токен. Удалить может только создатель.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -393,22 +464,23 @@ router.put(
  *         example: 1
  *       - $ref: '#/components/parameters/ApiKeyQueryParam'
  *     responses:
- *       '204':
- *         description: Мероприятие успешно удалено
+ *       '204': { description: 'Мероприятие успешно удалено' }
  *       '401': { $ref: '#/components/responses/UnauthorizedError' }
- *       '403': { $ref: '#/components/responses/ForbiddenError' }
+ *       '403': { description: 'Нет прав на удаление (не создатель) или неверный API ключ' }
  *       '404': { $ref: '#/components/responses/NotFoundError' }
  *       '500': { $ref: '#/components/responses/ServerError' }
  */
 router.delete(
   '/:id',
   passport.authenticate('jwt', { session: false }),
+  apiKeyAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const userPayload = req.user as UserJwtPayload | undefined;
-    if (!userPayload?.id) {
-      res.status(401).json({ message: 'Ошибка аутентификации JWT' });
-      return;
-    }
+     const userPayload = req.user as UserJwtPayload | undefined;
+     const currentUserId = userPayload?.id;
+     if (!currentUserId) {
+       res.status(401).json({ message: 'Ошибка аутентификации JWT' });
+       return;
+     }
 
     try {
       const eventId = parseInt(req.params.id, 10);
@@ -423,78 +495,248 @@ router.delete(
         return;
       }
 
-      // --- Optional Authorization Check ---
-      // if (event.createdBy !== userPayload.id) { ... }
+      // Проверка прав: удалить может только создатель
+      if (event.createdBy !== currentUserId) {
+          res.status(403).json({ message: 'У вас нет прав на удаление этого мероприятия' });
+          return;
+      }
 
-      await event.destroy();
+      await event.destroy(); // Записи в event_participants удалятся каскадно (onDelete: 'CASCADE')
       res.status(204).end(); // Успешное удаление
-    } catch /* istanbul ignore next */ {
-      // Убрано имя переменной 'error', т.к. не используется
-      // console.error(`Ошибка DELETE /api/events/${req.params.id}:`, error); // Закомментировано для no-console
-      res
-        .status(500)
-        .json({ message: 'Ошибка сервера при удалении мероприятия' });
+
+    } catch (error) {
+      console.error(`[API_ERROR] DELETE /api/events/${req.params.id}:`, error);
+      res.status(500).json({ message: 'Ошибка сервера при удалении мероприятия' });
     }
-  },
+  }
 );
 
-// --- Экспорт роутера ---
-export default router;
 
-// --- Swagger Компоненты (убедитесь, что они определены) ---
+// --- POST /api/events/:eventId/participate ---
+/**
+ * @openapi
+ * /api/events/{eventId}/participate:
+ *   post:
+ *     tags: [Events Participation]
+ *     summary: Зарегистрироваться на мероприятие
+ *     description: Регистрирует аутентифицированного пользователя как участника мероприятия. Нельзя участвовать в своих мероприятиях. Требует JWT токен и API ключ.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema: { type: integer, format: int64 }
+ *         description: ID мероприятия
+ *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     responses:
+ *       '201':
+ *          description: Успешная регистрация на мероприятие
+ *          content: { application/json: { schema: { type: object, properties: { message: { type: string } } } } }
+ *       '400': { description: 'Неверный ID или уже участвует' }
+ *       '401': { $ref: '#/components/responses/UnauthorizedError' }
+ *       '403': { description: 'Нельзя участвовать в собственном мероприятии или неверный API ключ' }
+ *       '404': { $ref: '#/components/responses/NotFoundError' }
+ *       '500': { $ref: '#/components/responses/ServerError' }
+ */
+router.post(
+  '/:eventId/participate',
+  passport.authenticate('jwt', { session: false }),
+  apiKeyAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userPayload = req.user as UserJwtPayload | undefined;
+    const userId = userPayload?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Ошибка аутентификации JWT' });
+      return;
+    }
+
+    try {
+      const eventId = parseInt(req.params.eventId, 10);
+      if (isNaN(eventId)) {
+        res.status(400).json({ message: 'ID мероприятия должен быть числом' });
+        return;
+      }
+
+      const event = await EventModel.findByPk(eventId, { attributes: ['id', 'createdBy']}); // Запрашиваем только нужные поля
+      if (!event) {
+        res.status(404).json({ message: 'Мероприятие не найдено' });
+        return;
+      }
+
+      if (event.createdBy === userId) {
+        res.status(403).json({ message: 'Вы не можете участвовать в собственном мероприятии' });
+        return;
+      }
+
+      const [_, created] = await EventParticipant.findOrCreate({
+        where: { userId, eventId },
+        defaults: { userId, eventId } // На случай если нужно передать доп. поля при создании
+      });
+
+      if (!created) {
+        res.status(400).json({ message: 'Вы уже зарегистрированы на это мероприятие' });
+        return;
+      }
+
+      res.status(201).json({ message: 'Вы успешно зарегистрировались на мероприятие' });
+
+    } catch (error) {
+      console.error(`[API_ERROR] POST /events/${req.params.eventId}/participate:`, error);
+      res.status(500).json({ message: 'Ошибка сервера при регистрации на мероприятие' });
+    }
+  }
+);
+
+// --- DELETE /api/events/:eventId/participate ---
+/**
+ * @openapi
+ * /api/events/{eventId}/participate:
+ *   delete:
+ *     tags: [Events Participation]
+ *     summary: Отменить участие в мероприятии
+ *     description: Удаляет запись об участии аутентифицированного пользователя в мероприятии. Требует JWT токен и API ключ.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema: { type: integer, format: int64 }
+ *         description: ID мероприятия
+ *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     responses:
+ *       '204': { description: 'Участие успешно отменено или пользователь и так не участвовал' }
+ *       '400': { description: 'Неверный ID мероприятия' }
+ *       '401': { $ref: '#/components/responses/UnauthorizedError' }
+ *       '403': { $ref: '#/components/responses/ForbiddenError' }
+ *       '404': { description: 'Мероприятие не найдено' } # Добавлено для проверки существования события
+ *       '500': { $ref: '#/components/responses/ServerError' }
+ */
+router.delete(
+  '/:eventId/participate',
+  passport.authenticate('jwt', { session: false }),
+  apiKeyAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userPayload = req.user as UserJwtPayload | undefined;
+    const userId = userPayload?.id;
+     if (!userId) {
+      res.status(401).json({ message: 'Ошибка аутентификации JWT' });
+      return;
+    }
+
+    try {
+       const eventId = parseInt(req.params.eventId, 10);
+      if (isNaN(eventId)) {
+        res.status(400).json({ message: 'ID мероприятия должен быть числом' });
+        return;
+      }
+
+      // Проверка существования мероприятия
+       const eventExists = await EventModel.findByPk(eventId, { attributes: ['id'] });
+       if (!eventExists) {
+          res.status(404).json({ message: 'Мероприятие не найдено' });
+          return;
+       }
+
+      // Удаляем запись, если она есть
+      await EventParticipant.destroy({
+        where: { userId, eventId },
+      });
+
+      res.status(204).end(); // Успех, даже если записи не было
+
+    } catch (error) {
+      console.error(`[API_ERROR] DELETE /events/${req.params.eventId}/participate:`, error);
+      res.status(500).json({ message: 'Ошибка сервера при отмене участия' });
+    }
+  }
+);
+
+// --- GET /api/events/:eventId/participants --- (Опционально, для модального окна)
+/**
+ * @openapi
+ * /api/events/{eventId}/participants:
+ *   get:
+ *     tags: [Events Participation]
+ *     summary: Получить список участников мероприятия
+ *     description: Возвращает список пользователей, зарегистрированных на мероприятие. Требует API ключ. (Возможно, стоит защитить JWT).
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema: { type: integer, format: int64 }
+ *         description: ID мероприятия
+ *       - $ref: '#/components/parameters/ApiKeyQueryParam'
+ *     security:
+ *       - BearerAuth: [] # Рекомендуется защитить этот эндпоинт
+ *     responses:
+ *       '200':
+ *          description: Список участников
+ *          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/User' } } } } # Возвращаем User без пароля
+ *       '401': { $ref: '#/components/responses/UnauthorizedError' } # Если JWT обязателен
+ *       '403': { $ref: '#/components/responses/ForbiddenError' }
+ *       '404': { $ref: '#/components/responses/NotFoundError' }
+ *       '500': { $ref: '#/components/responses/ServerError' }
+ */
+router.get(
+  '/:eventId/participants',
+  passport.authenticate('jwt', { session: false }), // Рекомендуется защитить
+  apiKeyAuth,
+  async (req: Request, res: Response): Promise<void> => {
+     try {
+       const eventId = parseInt(req.params.eventId, 10);
+       if (isNaN(eventId)) {
+         res.status(400).json({ message: 'ID мероприятия должен быть числом' });
+         return;
+       }
+
+       const event = await EventModel.findByPk(eventId, {
+         // Включаем связь 'participants', которую мы определили в модели EventModel
+         include: [{
+           model: User,
+           as: 'participants', // Используем псевдоним
+           attributes: ['id', 'name', 'email'], // Явно указываем, какие поля пользователя вернуть (БЕЗ ПАРОЛЯ)
+           through: { attributes: [] } // Не включаем поля из промежуточной таблицы EventParticipant
+         }]
+       });
+
+       if (!event) {
+         res.status(404).json({ message: 'Мероприятие не найдено' });
+         return;
+       }
+
+       // event.participants будет содержать массив объектов User
+       // @ts-ignore // Sequelize типизация для include может быть сложной, игнорируем возможную ошибку
+       const participants = event.participants || [];
+
+       res.status(200).json(participants);
+
+     } catch (error) {
+       console.error(`[API_ERROR] GET /events/${req.params.eventId}/participants:`, error);
+       res.status(500).json({ message: 'Ошибка сервера при получении списка участников' });
+     }
+});
+
+
+// --- Swagger Компоненты (Ссылки) ---
+// Убедитесь, что эти компоненты определены в swagger.ts или здесь, или в моделях
 /**
  * @openapi
  * components:
  *   parameters:
- *     ApiKeyQueryParam:
- *       in: query
- *       name: apiKey
- *       schema: { type: string }
- *       required: false
- *       description: API-ключ (альтернатива заголовку x-api-key)
+ *     # ApiKeyQueryParam: (определен в swagger.ts или event.ts)
  *   securitySchemes:
- *      BearerAuth:
- *        type: http
- *        scheme: bearer
- *        bearerFormat: JWT
+ *      # BearerAuth: (определен в swagger.ts или auth.ts)
  *   schemas:
- *      CreateEventInput:
- *          type: object
- *          required: [title, category, date]
- *          properties:
- *              title: { type: string, minLength: 3, maxLength: 100 }
- *              description: { type: string, maxLength: 500, nullable: true }
- *              date: { type: string, format: date-time, description: "Дата и время в формате ISO 8601" }
- *              category: { type: string, enum: [concert, lecture, exhibition] }
- *      UpdateEventInput:
- *          type: object
- *          properties:
- *              title: { type: string, minLength: 3, maxLength: 100 }
- *              description: { type: string, maxLength: 500, nullable: true }
- *              date: { type: string, format: date-time, nullable: true, description: "Дата и время ISO 8601 или null" }
- *              category: { type: string, enum: [concert, lecture, exhibition] }
- *      # EventModel: { ... } - Должна быть в models/event.ts
- *      # User: { ... } - Должна быть в models/user.ts
- *      ErrorResponse:
- *          type: object
- *          properties:
- *              message: { type: string, example: "Ошибка сервера" }
- *              details: { type: any, nullable: true, example: "Дополнительная информация"}
+ *      # CreateEventInput: (определен в event.ts или swagger.ts)
+ *      # UpdateEventInput: (определен в event.ts или swagger.ts)
+ *      # EventModel: (определен в event.ts)
+ *      # User: (определен в user.ts)
+ *      # ErrorResponse: (определен в swagger.ts)
  *   responses:
- *      UnauthorizedError:
- *          description: Ошибка авторизации
- *          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}
- *      ForbiddenError:
- *          description: Ошибка доступа
- *          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}
- *      BadRequestError:
- *          description: Неверный запрос
- *          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}
- *      NotFoundError:
- *          description: Ресурс не найден
- *          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}
- *      ServerError:
- *          description: Внутренняя ошибка сервера
- *          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }}}
+ *      # UnauthorizedError, ForbiddenError, BadRequestError, NotFoundError, ServerError: (определены в swagger.ts)
  */
-// --- END OF FILE routes/events.ts ---
+
+// --- Экспорт роутера ---
+export default router;

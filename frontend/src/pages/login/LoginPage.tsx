@@ -1,101 +1,164 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import styles from './login.module.scss';
-import { authService } from '../../api/authService'; // Импортируем значение (объект сервиса)
-import type { LoginPayload } from '../../api/authService'; // Импортируем тип LoginPayloadimport { AxiosError } from 'axios';
-import { getToken } from '../../utils/storage'; // Для проверки авторизации
-import { AxiosError } from 'axios'
+// src/pages/login/LoginPage.tsx
+
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import styles from "./login.module.scss";
+import type { LoginPayload } from "../../api/authService"; // Импортируем тип
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import {
+  loginUser,
+  selectAuthIsLoading,
+  selectAuthError,
+  selectIsAuthenticated,
+  clearAuthError, // Экшен для сброса ошибки
+} from "../../features/auth/authSlice";
+
+// Компонент для отображения ошибок
+import ErrorNotification from "../../components/errorNotification/ErrorNotification"; // Импортируем компонент
+
+// Утилита для проверки токена (для начального редиректа)
+import { getToken } from "../../utils/storage";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // Локальное состояние для полей ввода и сообщения об успехе после регистрации
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null); // Для сообщения после регистрации
+
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation(); // Для получения state (сообщения)
+  const dispatch = useAppDispatch();
+
+  // Получаем состояние из Redux store
+  const isLoading = useAppSelector(selectAuthIsLoading);
+  const authError = useAppSelector(selectAuthError); // Сообщение об ошибке из Redux
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   useEffect(() => {
-    // Проверка, авторизован ли пользователь при монтировании компонента
-    const token = getToken(); // Используем функцию из storage
-    if (token) {
-      navigate('/events', { replace: true });
+    // Редирект, если пользователь уже аутентифицирован
+    if (isAuthenticated) {
+      // Пытаемся получить путь, с которого пришли, или по умолчанию на /events
+      const from = location.state?.from?.pathname || "/events";
+      navigate(from, { replace: true });
+      return; // Прерываем эффект
     }
 
-    // Проверка сообщения об успешной регистрации
+    // Дополнительная проверка токена на случай, если Redux стейт еще не синхронизирован
+    const token = getToken();
+    if (token && !isAuthenticated) {
+      navigate("/events", { replace: true });
+      return;
+    }
+
+    // Проверка сообщения об успешной регистрации, переданного через state
     if (location.state?.message) {
       setSuccessMessage(location.state.message);
-      // Очищаем state, чтобы сообщение не показывалось снова при обновлении
-      window.history.replaceState({}, document.title)
+      // Очищаем state в истории браузера, чтобы сообщение не показывалось повторно
+      window.history.replaceState({}, document.title);
     }
-  }, [navigate, location.state]);
 
+    // Функция очистки для useEffect: сбрасываем ошибку при размонтировании
+    // return () => {
+    //   dispatch(clearAuthError());
+    // };
+    // Убрал очистку при размонтировании, т.к. теперь есть кнопка для сброса
+  }, [navigate, location.state, isAuthenticated, dispatch]); // Убрал зависимость от getToken
+
+  // Обработчик отправки формы
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
     setSuccessMessage(null); // Сбрасываем сообщение об успехе при новой попытке
+    dispatch(clearAuthError()); // Сбрасываем предыдущие ошибки перед новым запросом
 
+    // Простая локальная валидация на пустоту полей
     if (!email || !password) {
-      setError('Пожалуйста, заполните все поля.');
+      // Вместо установки локальной ошибки, можно диспатчить кастомный экшен
+      // или просто не отправлять запрос и положиться на required атрибуты HTML (хотя это не лучший UX)
+      // Пока просто выведем в консоль или можно сделать локальный setError, если нужно
+      console.warn("Поля Email и Пароль не должны быть пустыми.");
+      // Если хотите показать ошибку валидации через наш компонент:
+      // dispatch(/* ваш кастомный экшен для ошибки валидации */);
       return;
     }
 
     const credentials: LoginPayload = { email, password };
 
-    try {
-      const loginResponse = await authService.login(credentials);
-      console.log('Успешный вход, пользователь:', loginResponse.user);
-      // Токены и пользователь уже сохранены в localStorage через authService
-      // Можно обновить глобальное состояние здесь, если используется (например, через Context)
-      navigate('/events'); // Перенаправляем на страницу мероприятий
-    } catch (err) {
-      const axiosError = err as AxiosError<{ message?: string; details?: any; error?: string }>;
-      if (axiosError.response?.data) {
-        const data = axiosError.response.data;
-        setError(`${axiosError.response.status} - ${data.message || data.error || 'Ошибка сервера'}`);
-      } else if (axiosError.message) {
-        setError(axiosError.message);
-      } else {
-        setError('Произошла неизвестная ошибка при авторизации.');
-      }
-      console.error('Ошибка авторизации:', err);
-    }
+    // Диспатчим асинхронный thunk loginUser
+    // Результат (успех или ошибка) будет обработан в extraReducers в authSlice,
+    // что обновит состояние isLoading, authError, isAuthenticated, user.
+    // Компонент перерисуется благодаря useAppSelector.
+    // Редирект при успехе произойдет в useEffect выше при изменении isAuthenticated.
+    dispatch(loginUser(credentials));
+  };
+
+  // Функция для сброса ошибки при нажатии на кнопку закрытия в ErrorNotification
+  const handleDismissError = () => {
+    dispatch(clearAuthError());
   };
 
   return (
     <div className={styles.loginPageContainer}>
       <div className={styles.loginFormWrapper}>
         <h2>Авторизация</h2>
-        <form onSubmit={handleSubmit} className={styles.loginForm}>
-          {error && <div className={styles.errorMessage}>{error}</div>}
-          {successMessage && <div className={styles.successMessage}>{successMessage}</div>}
+        <form onSubmit={handleSubmit} className={styles.loginForm} noValidate>
+          {/* Используем компонент ErrorNotification для отображения ошибки из Redux */}
+          <ErrorNotification
+            message={authError}
+            onDismiss={handleDismissError}
+          />
+
+          {/* Отображение сообщения об успехе после регистрации */}
+          {successMessage && (
+            <div className={styles.successMessage}>{successMessage}</div>
+          )}
+
+          {/* Поле Email */}
           <div className={styles.formGroup}>
             <label htmlFor="email">Email:</label>
             <input
               type="email"
               id="email"
+              name="email" // Атрибут name важен для автозаполнения браузера
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              required // HTML5 валидация
               placeholder="your@example.com"
+              disabled={isLoading} // Блокируем поле во время загрузки
+              autoComplete="email"
             />
           </div>
+
+          {/* Поле Пароль */}
           <div className={styles.formGroup}>
             <label htmlFor="password">Пароль:</label>
             <input
               type="password"
               id="password"
+              name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="********"
+              disabled={isLoading}
+              autoComplete="current-password"
             />
           </div>
-          <button type="submit" className={styles.submitButton}>
-            Войти
+
+          {/* Кнопка отправки */}
+          <button
+            type="submit"
+            className={styles.submitButton}
+            disabled={isLoading}
+          >
+            {isLoading ? "Вход..." : "Войти"}
           </button>
         </form>
+
+        {/* Ссылка на регистрацию */}
         <div className={styles.alternativeAction}>
-          Нет аккаунта?{' '}
+          Нет аккаунта?{" "}
           <Link to="/register" className={styles.link}>
             Зарегистрироваться
           </Link>

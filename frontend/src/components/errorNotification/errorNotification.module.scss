@@ -1,0 +1,38 @@
+// src/components/errorNotification/errorNotification.module.scss
+
+.errorNotification {
+  background-color: #f8d7da; // Светло-красный фон
+  color: #721c24; // Темно-красный текст
+  padding: 0.8rem 1.25rem;
+  margin-bottom: 1rem; // Отступ снизу по умолчанию
+  border: 1px solid #f5c6cb;
+  border-radius: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.errorMessage {
+  flex-grow: 1;
+  margin-right: 1rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #721c24;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+}
